@@ -1,23 +1,31 @@
+# OpenClaw 文件路径标准
+
 新 OpenClaw 容器环境 - 统一路径标准安装步骤
 
 ## 第一步：创建目录结构
 
-**1. 创建用户插件目录**
+**1.创建用户bin目录**
+
+```
+mkdir -p /home/node/bin
+```
+
+**2. 创建用户插件目录**
 
 ```
 mkdir -p /home/node/.openclaw/extensions
 ```
 
-**2. 创建用户数据目录**
+**3. 创建用户数据目录**
 
 ```bash
 mkdir -p /home/node/.openclaw/data
 ```
 
-**3. 创建用户 node_modules 用于存放缺失依赖**
+**4. 创建用户 node_modules 用于存放缺失依赖**
 
 ```bash
-mkdir -p /home/node/node_modules
+mkdir -p /home/node/npm/node_modules
 ```
 
 ## 第二步：配置环境变量（只需一次）
@@ -25,70 +33,51 @@ mkdir -p /home/node/node_modules
 **# 添加到三个位置确保加载**
 
 ```
-echo 'export NODE_PATH="$NODE_PATH:/home/node/node_modules"' >> ~/.profile
+# /home/node/bin
+echo 'export NODE_PATH="$NODE_PATH:/home/node/bin"' >> ~/.profile
 
-echo 'export NODE_PATH="$NODE_PATH:/home/node/node_modules"' >> ~/.bashrc
+echo 'export NODE_PATH="$NODE_PATH:/home/node/bin"' >> ~/.bashrc
 
-echo 'export NODE_PATH="$NODE_PATH:/home/node/node_modules"' >> ~/.openclaw/.profile
+echo 'export NODE_PATH="$NODE_PATH:/home/node/bin"' >> ~/.openclaw/.profile
+
+# /home/node/node_modules
+echo 'export NODE_PATH="$NODE_PATH:/home/node/npm/node_modules"' >> ~/.profile
+
+echo 'export NODE_PATH="$NODE_PATH:/home/node/npm/node_modules"' >> ~/.bashrc
+
+echo 'export NODE_PATH="$NODE_PATH:/home/node/npm/node_modules"' >> ~/.openclaw/.profile
 ```
 
 ## 第三步：安装依赖遵循的规则
 
 | 场景             | 操作                                                         |
 | ---------------- | ------------------------------------------------------------ |
-| 内置插件缺依赖   | cd /home/node && npm install <package-name> --prefix /home/node |
+| 安装二进制文件   | 把所有二进制文件都放置于/home/node/bin                       |
+| 内置插件缺依赖   | cd /home/node/npm && npm install <package-name> --prefix /home/node/npm |
 | 安装第三方插件   | 把插件放到 /home/node/.openclaw/extensions/<plugin-id>/，然后在 openclaw.json 中启用 |
-| 第三方插件缺依赖 | 同上，依赖装去 /home/node/node_modules                       |
+| 第三方插件缺依赖 | 同上，依赖装去 /home/node/npm/node_modules                   |
 
-## 第四步：配置 openclaw.json 示例
-
-```json
-  "plugins": {
-    "slots": {
-      "memory": "memory-lancedb"
-    },
-    "entries": {
-      "qwen-portal-auth": {
-        "enabled": true
-      },
-      "feishu": {
-        "enabled": true
-      },
-      "memory-lancedb": {
-        "enabled": true,
-        "config": {
-          "embedding": {
-            "apiKey": "YOUR_API_KEY",
-            "model": "BAAI/bge-large-zh-v1.5",
-            "baseUrl": "https://api.siliconflow.cn/v1",
-            "dimensions": 1024
-          },
-          "autoCapture": true,
-          "autoRecall": true,
-          "captureMaxChars": 500
-        }
-      }
-    },
-```
-
-完整目录结构（最终）
+## 第四步：完整目录结构（最终）
 
 ```
 /home/node/
 ├── .profile # 环境变量（含 NODE_PATH）
 ├── .bashrc # 环境变量（含 NODE_PATH）
-├── node_modules/ # 👉 用户安装的依赖包（这里缺的依赖都装这）
-│ ├── openai/
-│ └── @lancedb/
+├── bin # 二进制文件
+├── npm/                 # 👈 **所有 npm 相关文件都在这里**
+│   ├── node_modules/    # 已安装的 npm 包 (@lancedb/lancedb, openai)
+│   ├── .npm/            # npm 缓存
+│   ├── package.json
+│   └── package-lock.json
 └── .openclaw/
-├── .profile # 环境变量（含 NODE_PATH）
-├── openclaw.json # 主配置文件
-├── extensions/ # 👉 用户安装的第三方插件
-│ └── README.md # 本文档标准说明
-├── data/ # 👉 通用运行时数据
-├── memory/ # 记忆数据
-│ └── lancedb/ # memory-lancedb 向量数据库
-└── workspace/ # 工作空间（日记、长期记忆）
+    ├── .profile # 环境变量（含 NODE_PATH）
+    ├── openclaw.json # 主配置文件
+    ├── extensions/ # 👉 用户安装的第三方插件
+    │ └── README.md # 本文档标准说明
+    ├── data/ # 👉 通用运行时数据
+    ├── memory/ # 记忆数据
+    │ └── lancedb/ # memory-lancedb 向量数据库
+    └── workspace/ # 工作空间（日记、长期记忆）
 ```
 
 ## 第五步：验证
@@ -96,7 +85,7 @@ echo 'export NODE_PATH="$NODE_PATH:/home/node/node_modules"' >> ~/.openclaw/.pro
 安装完成后检查：
 
 ```bash
-export NODE_PATH="$NODE_PATH:/home/node/node_modules"
+export NODE_PATH="$NODE_PATH:/home/node/npm/node_modules"
 
 openclaw status
 ```
@@ -104,6 +93,8 @@ openclaw status
 看到插件正常注册就是成功。
 
 核心原则：
+
+- 二进制文件 → /home/node/bin
 
 - 只读内置代码 → /app/extensions/ 不动
 
