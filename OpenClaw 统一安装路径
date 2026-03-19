@@ -1,0 +1,116 @@
+新 OpenClaw 容器环境 - 统一路径标准安装步骤
+
+## 第一步：创建目录结构
+
+**1. 创建用户插件目录**
+
+```
+mkdir -p /home/node/.openclaw/extensions
+```
+
+**2. 创建用户数据目录**
+
+```bash
+mkdir -p /home/node/.openclaw/data
+```
+
+**3. 创建用户 node_modules 用于存放缺失依赖**
+
+```bash
+mkdir -p /home/node/node_modules
+```
+
+## 第二步：配置环境变量（只需一次）
+
+**# 添加到三个位置确保加载**
+
+```
+echo 'export NODE_PATH="$NODE_PATH:/home/node/node_modules"' >> ~/.profile
+
+echo 'export NODE_PATH="$NODE_PATH:/home/node/node_modules"' >> ~/.bashrc
+
+echo 'export NODE_PATH="$NODE_PATH:/home/node/node_modules"' >> ~/.openclaw/.profile
+```
+
+## 第三步：安装依赖遵循的规则
+
+| 场景             | 操作                                                         |
+| ---------------- | ------------------------------------------------------------ |
+| 内置插件缺依赖   | cd /home/node && npm install <package-name> --prefix /home/node |
+| 安装第三方插件   | 把插件放到 /home/node/.openclaw/extensions/<plugin-id>/，然后在 openclaw.json 中启用 |
+| 第三方插件缺依赖 | 同上，依赖装去 /home/node/node_modules                       |
+
+## 第四步：配置 openclaw.json 示例
+
+```json
+  "plugins": {
+    "slots": {
+      "memory": "memory-lancedb"
+    },
+    "entries": {
+      "qwen-portal-auth": {
+        "enabled": true
+      },
+      "feishu": {
+        "enabled": true
+      },
+      "memory-lancedb": {
+        "enabled": true,
+        "config": {
+          "embedding": {
+            "apiKey": "YOUR_API_KEY",
+            "model": "BAAI/bge-large-zh-v1.5",
+            "baseUrl": "https://api.siliconflow.cn/v1",
+            "dimensions": 1024
+          },
+          "autoCapture": true,
+          "autoRecall": true,
+          "captureMaxChars": 500
+        }
+      }
+    },
+```
+
+完整目录结构（最终）
+
+```
+/home/node/
+├── .profile # 环境变量（含 NODE_PATH）
+├── .bashrc # 环境变量（含 NODE_PATH）
+├── node_modules/ # 👉 用户安装的依赖包（这里缺的依赖都装这）
+│ ├── openai/
+│ └── @lancedb/
+└── .openclaw/
+├── .profile # 环境变量（含 NODE_PATH）
+├── openclaw.json # 主配置文件
+├── extensions/ # 👉 用户安装的第三方插件
+│ └── README.md # 本文档标准说明
+├── data/ # 👉 通用运行时数据
+├── memory/ # 记忆数据
+│ └── lancedb/ # memory-lancedb 向量数据库
+└── workspace/ # 工作空间（日记、长期记忆）
+```
+
+## 第五步：验证
+
+安装完成后检查：
+
+```bash
+export NODE_PATH="$NODE_PATH:/home/node/node_modules"
+
+openclaw status
+```
+
+看到插件正常注册就是成功。
+
+核心原则：
+
+- 只读内置代码 → /app/extensions/ 不动
+
+- 用户插件 → /home/node/.openclaw/extensions/
+
+- 用户依赖 → /home/node/node_modules/ + NODE_PATH
+
+- 数据 → /home/node/.openclaw/ 下相应目录
+
+完全符合 OpenClaw 的设计，只是适配了容器权限限制。
