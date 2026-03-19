@@ -1,0 +1,100 @@
+# memory-lancedb 安装配置详细步骤
+
+按照 OpenClaw 文件路径标准，完成安装的步骤如下：
+
+## 1. 安装依赖包
+
+```bash
+cd /home/node
+
+npm install @lancedb/lancedb openai --prefix /home/node
+```
+
+## 2. 配置 openclaw.json
+
+编辑 /home/node/.openclaw/openclaw.json，在 plugins 中添加：
+
+```bash
+  "plugins": {
+    "slots": {
+      "memory": "memory-lancedb"
+    },
+    "entries": {
+      "qwen-portal-auth": {
+        "enabled": true
+      },
+      "feishu": {
+        "enabled": true
+      },
+      "memory-lancedb": {
+        "enabled": true,
+        "config": {
+          "embedding": {
+            "apiKey": "YOUR_API_KEY",
+            "model": "BAAI/bge-large-zh-v1.5",
+            "baseUrl": "https://api.siliconflow.cn/v1",
+            "dimensions": 1024
+          },
+          "autoCapture": true,
+          "autoRecall": true,
+          "captureMaxChars": 500
+        }
+      }
+    },
+```
+
+当前实际配置（使用您的API Key）：
+
+- API Key: YOUR_API_KEY
+
+- 模型: BAAI/bge-large-zh-v1.5
+
+- 自动捕获: ✅ 开启
+
+- 自动回忆: ✅ 开启
+- 创建内存数据目录
+
+```ash
+mkdir -p /home/node/.openclaw/memory/lancedb
+```
+
+## 3. 验证安装
+
+```bash
+openclaw status
+
+看到以下输出表示成功：
+
+[plugins] memory-lancedb: plugin registered (db: /home/node/.openclaw/memory/lancedb, lazy init)
+
+状态概览中会显示：
+
+│ Memory│ enabled (plugin memory-lancedb)│
+```
+
+最终目录结构
+
+```bash
+/home/node/
+├── node_modules/
+│   ├── @lancedb/
+│   ├── openai/
+│   └── ...
+└── .openclaw/
+​    ├── openclaw.json (已配置)
+​    ├── extensions/
+​    ├── data/
+​    └── memory/
+​        └── lancedb/ (向量数据库存储)
+```
+
+核心要点
+
+| 遵循的标准 | 位置                                 |
+| ---------- | ------------------------------------ |
+| 用户插件   | /home/node/.openclaw/extensions/     |
+| 用户依赖   | /home/node/node_modules/ + NODE_PATH |
+| 数据       | /home/node/.openclaw/memory/lancedb/ |
+| 内置代码   | /app/extensions/ 未修改              |
+
+安装完成 ✅
