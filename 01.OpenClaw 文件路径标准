@@ -1,10 +1,8 @@
-# OpenClaw 文件路径标准
+# 01.OpenClaw 文件路径标准
 
 新 OpenClaw 容器环境 - 统一路径标准安装步骤
 
 ## 第一步：创建目录结构
-
-初次使用时，请为我创建如下所需目录
 
 **1.创建用户bin目录**
 
@@ -94,16 +92,17 @@ openclaw status
 
 看到插件正常注册就是成功。
 
+## 判断规则（遵循 OpenClaw 文件路径标准）
+
+| 插件类型   | 判断依据                                | 安装路径                            | 命令                                                         |
+| ---------- | --------------------------------------- | ----------------------------------- | ------------------------------------------------------------ |
+| 内置插件   | 代码在 /app/extensions/                 | 依赖 → /home/node/npm/node_modules/ | cd /home/node/npm && npm install <package> --prefix /home/node/npm |
+| 第三方插件 | 代码在 /home/node/.openclaw/extensions/ | 依赖 → /home/node/npm/node_modules/ | 同上                                                         |
+| 二进制文件 | 可执行程序 → /home/node/bin             | /home/node/bin                      | 直接放置                                                     |
+
 核心原则：
 
-- 二进制文件 → /home/node/bin
-
-- 只读内置代码 → /app/extensions/ 不动
-
-- 用户插件 → /home/node/.openclaw/extensions/
-
-- 用户依赖 → /home/node/node_modules/ + NODE_PATH
-
-- 数据 → /home/node/.openclaw/ 下相应目录
-
-完全符合 OpenClaw 的设计，只是适配了容器权限限制。
+1. 只读内置代码 → /app/extensions/ 永远不动 ✅
+2. 所有 npm 相关文件都在 /home/node/npm/ ✅
+3. 用户依赖都在 /home/node/npm/node_modules/ ✅
+4. 环境变量添加 /home/node/npm/node_modules 到 NODE_PATH ✅
