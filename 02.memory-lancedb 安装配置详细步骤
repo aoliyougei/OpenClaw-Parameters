@@ -121,7 +121,7 @@ openclaw status
 ### 6.1 创建测试脚本
 
 ```bash
-cat > /home/node/.openclaw/workspace/test-memory.js << 'EOF'
+cat > /home/node/tmp/test-memory.js << 'EOF'
 /**
  * Test script for memory-lancedb plugin functionality
  */
@@ -292,7 +292,7 @@ EOF
 ### 6.2 运行测试
 
 ```bash
-cd /home/node/.openclaw/workspace
+cd /home/node/tmp
 node test-memory.js
 ```
 
