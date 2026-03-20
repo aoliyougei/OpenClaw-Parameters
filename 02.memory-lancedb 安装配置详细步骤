@@ -292,7 +292,7 @@ EOF
 ### 6.2 运行测试
 
 ```bash
-cd /home/node/tmp
+cd /home/node/tmp/
 node test-memory.js
 ```
 
@@ -306,6 +306,14 @@ memory-lancedb plugin is working correctly.
 ```
 
 如果看到这个，表示**安装成功，功能完全正常**。
+
+### 6.4 成功清理
+
+测试成功后清理掉测试文件
+
+```bash
+rm /home/node/tmp/test-memory.js
+```
 
 ## 7. 常见问题解决
 
