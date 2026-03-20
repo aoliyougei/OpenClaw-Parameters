@@ -17,7 +17,7 @@ mkdir -p /home/node/.openclaw/memory/lancedb
 
 ## 2. 安装依赖包
 
-按照路径标准，依赖包安装到 `/home/node/npm/node_modules/`：
+按照路径标准，依赖包安装到 `/home/node/npm/node_modules/`
 
 ```bash
 cd /home/node/npm
