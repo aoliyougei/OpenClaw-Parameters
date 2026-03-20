@@ -1,31 +1,65 @@
-# 02.Memory-LanceDB 安装配置详细步骤
+# memory-lancedb 向量记忆插件 安装配置详细步骤
 
-按照 OpenClaw 文件路径标准，完成安装的步骤如下：
+遵循 OpenClaw 文件路径标准，结合实际测试验证，完整安装步骤如下：
 
-## 1. 安装依赖包
+## 前置条件
+
+- OpenClaw 已按照标准路径安装
+- Node.js v18+ 已安装
+- 已配置 `NODE_PATH` 环境变量（包含 `/home/node/npm/node_modules`）
+
+## 1. 创建所需目录结构
+
+```bash
+# 创建向量数据库存储目录
+mkdir -p /home/node/.openclaw/memory/lancedb
+```
+
+## 2. 安装依赖包
+
+按照路径标准，依赖包安装到 `/home/node/npm/node_modules/`：
 
 ```bash
 cd /home/node/npm
-
 npm install @lancedb/lancedb openai --prefix /home/node/npm
 ```
 
-## 2. 配置 openclaw.json
+### 重要说明：
 
-编辑 /home/node/.openclaw/openclaw.json，在 plugins 中添加：
+- `@lancedb/lancedb` 会根据你的系统架构自动安装对应原生依赖包
+
+  - Linux x86_64 会自动安装 `@lancedb/lancedb-linux-x64-gnu`
+  - Linux ARM64 会自动安装 `@lancedb/lancedb-linux-arm64-gnu`
+
+- 如果自动安装失败，需要手动安装对应架构包：
+
+  ```bash
+  # Linux x86_64 示例
+  npm install @lancedb/lancedb-linux-x64-gnu --prefix /home/node/npm
+  ```
+
+## 3. 验证依赖安装
 
 ```bash
+# 验证模块安装位置
+ls -la /home/node/npm/node_modules/@lancedb/
+# 应该能看到 lancedb 和对应架构包
+
+# 验证原生包（Linux x86_64）
+ls -la /home/node/npm/node_modules/@lancedb/lancedb-linux-x64-gnu/
+```
+
+## 4. 配置 openclaw.json
+
+编辑 `/home/node/.openclaw/openclaw.json`，在 `plugins` 部分添加配置：
+
+```json
+{
   "plugins": {
     "slots": {
       "memory": "memory-lancedb"
     },
     "entries": {
-      "qwen-portal-auth": {
-        "enabled": true
-      },
-      "feishu": {
-        "enabled": true
-      },
       "memory-lancedb": {
         "enabled": true,
         "config": {
@@ -40,62 +74,327 @@ npm install @lancedb/lancedb openai --prefix /home/node/npm
           "captureMaxChars": 500
         }
       }
-    },
+    }
+  }
+}
 ```
 
-当前实际配置（使用您的API Key）：
+### 配置说明：
 
-- API Key: YOUR_API_KEY
+| 配置项        | 说明                                                         |
+| ------------- | ------------------------------------------------------------ |
+| `apiKey`      | 替换为你的 SiliconFlow API 密钥（或其他兼容 OpenAI 接口的 API Key） |
+| `model`       | 使用 BAAI/bge-large-zh-v1.5 中文开源嵌入模型                 |
+| `baseUrl`     | SiliconFlow 接口地址，可替换为其他 OpenAI 兼容地址           |
+| `dimensions`  | BAAI/bge-large-zh-v1.5 输出 1024 维向量                      |
+| `autoCapture` | 自动捕获会话记忆，建议开启                                   |
+| `autoRecall`  | 自动根据查询检索相关记忆，建议开启                           |
 
-- 模型: BAAI/bge-large-zh-v1.5
-
-- 自动捕获: ✅ 开启
-
-- 自动回忆: ✅ 开启
-- 创建内存数据目录
-
-```ash
-mkdir -p /home/node/.openclaw/memory/lancedb
-```
-
-## 3. 验证安装
+## 5. 验证安装
 
 ```bash
+# 检查 NODE_PATH 环境变量
+echo $NODE_PATH
+# 应包含 /home/node/npm/node_modules
+
+# 如果没有添加，请编辑 ~/.profile 和 ~/.bashrc 添加：
+echo 'export NODE_PATH=/home/node/npm/node_modules:/home/node/bin:$NODE_PATH' >> ~/.profile
+echo 'export NODE_PATH=/home/node/npm/node_modules:/home/node/bin:$NODE_PATH' >> ~/.bashrc
+source ~/.profile
+
+# 验证插件加载
 openclaw status
-
-看到以下输出表示成功：
-
-[plugins] memory-lancedb: plugin registered (db: /home/node/.openclaw/memory/lancedb, lazy init)
-
-状态概览中会显示：
-
-│ Memory│ enabled (plugin memory-lancedb)│
 ```
 
-最终目录结构
+**成功标志**，你应该看到类似输出：
+
+```
+[plugins] memory-lancedb: plugin registered (db: /home/node/.openclaw/memory/lancedb, lazy init)
+...
+│ Memory          │ enabled (plugin memory-lancedb)                                                                    │
+```
+
+## 6. 功能测试（必须执行）
+
+安装完成后需要进行实际功能测试，验证写入和搜索是否正常工作：
+
+### 6.1 创建测试脚本
 
 ```bash
-/home/node/
-├── npm
-    └── node_modules/
-│				├── @lancedb/
-│				├── openai/
-│				└── ...
-└── .openclaw/
-		├── openclaw.json (已配置)
-		├── extensions/
-		├── data/
-		└── memory/
-				└── lancedb/ (向量数据库存储)
+cat > /home/node/.openclaw/workspace/test-memory.js << 'EOF'
+/**
+ * Test script for memory-lancedb plugin functionality
+ */
+
+import { randomUUID } from "node:crypto";
+import fs from "node:fs";
+import lancedb from "/home/node/npm/node_modules/@lancedb/lancedb/dist/index.js";
+import OpenAI from "/home/node/npm/node_modules/openai/index.mjs";
+
+const config = JSON.parse(fs.readFileSync("/home/node/.openclaw/openclaw.json", "utf8"));
+const memoryConfig = config.plugins.entries["memory-lancedb"].config;
+const dbPath = "/home/node/.openclaw/memory/lancedb";
+const TABLE_NAME = "memories";
+
+async function testLanceDBConnection() {
+  console.log("=== Testing LanceDB Connection ===\n");
+  const db = await lancedb.connect(dbPath);
+  console.log("✅ Connected to LanceDB successfully");
+  const tables = await db.tableNames();
+  console.log(`📋 Tables in database: ${JSON.stringify(tables)}`);
+  let table;
+  if (tables.includes(TABLE_NAME)) {
+    table = await db.openTable(TABLE_NAME);
+    console.log("✅ Opened existing table");
+  } else {
+    const schemaData = [{
+      id: "__init__",
+      text: "initialization record",
+      vector: Array.from({ length: memoryConfig.embedding.dimensions }).fill(0),
+      importance: 0,
+      category: "test",
+      createdAt: Date.now(),
+    }];
+    table = await db.createTable(TABLE_NAME, schemaData);
+    await table.delete('id = "__init__"');
+    console.log("✅ Created new table");
+  }
+  const count = await table.countRows();
+  console.log(`📊 Current row count: ${count}`);
+  return { db, table };
+}
+
+async function testEmbeddingGeneration(openai) {
+  console.log("\n=== Testing Embedding Generation ===\n");
+  const response = await openai.embeddings.create({
+    model: memoryConfig.embedding.model,
+    input: "这是一条测试记忆，用于测试 memory-lancedb 插件功能是否正常",
+    dimensions: memoryConfig.embedding.dimensions,
+  });
+  const embedding = response.data[0].embedding;
+  console.log(`✅ Generated embedding successfully`);
+  console.log(`📊 Embedding dimensions: ${embedding.length}`);
+  console.log(`📊 Expected dimensions: ${memoryConfig.embedding.dimensions}`);
+  if (embedding.length !== memoryConfig.embedding.dimensions) {
+    throw new Error(`Dimension mismatch: got ${embedding.length}, expected ${memoryConfig.embedding.dimensions}`);
+  }
+  return embedding;
+}
+
+async function testInsertMemory(table, embedding) {
+  console.log("\n=== Testing Memory Insertion ===\n");
+  const testEntry = {
+    id: randomUUID(),
+    text: "这是一条测试记忆，创建于 " + new Date().toISOString(),
+    vector: embedding,
+    importance: 5,
+    category: "test",
+    createdAt: Date.now(),
+  };
+  await table.add([testEntry]);
+  console.log(`✅ Inserted test memory successfully`);
+  console.log(`📝 Memory: ${testEntry.text}`);
+  console.log(`🔑 ID: ${testEntry.id}`);
+  const newCount = await table.countRows();
+  console.log(`📊 New row count: ${newCount}`);
+  return testEntry;
+}
+
+async function testVectorSearch(table, embedding) {
+  console.log("\n=== Testing Vector Search ===\n");
+  const results = await table.search(embedding).limit(5).toArray();
+  console.log(`✅ Vector search completed successfully`);
+  console.log(`🔍 Found ${results.length} results`);
+  results.forEach((result, index) => {
+    const score = result.score ?? result._distance ?? 0;
+    console.log(`\n${index + 1}. [score/distance: ${score ? score.toFixed(4) : 'N/A'}]`);
+    console.log(`   ID: ${result.id}`);
+    console.log(`   Text: ${result.text}`);
+    console.log(`   Category: ${result.category}`);
+    console.log(`   Importance: ${result.importance}`);
+  });
+  return results;
+}
+
+async function testMultipleMemories(table, openai) {
+  console.log("\n=== Testing Multiple Memories ===\n");
+  const testTexts = [
+    "HanMing 喜欢测试开源项目和阅读源代码",
+    "OpenClaw 是一个个人人工智能助手框架",
+    "memory-lancedb 使用 LanceDB 作为向量数据库",
+    "企业微信插件提供了通讯录、文档、待办等功能集成",
+  ];
+  for (const text of testTexts) {
+    const response = await openai.embeddings.create({
+      model: memoryConfig.embedding.model,
+      input: text,
+      dimensions: memoryConfig.embedding.dimensions,
+    });
+    const entry = {
+      id: randomUUID(),
+      text,
+      vector: response.data[0].embedding,
+      importance: 3,
+      category: "test",
+      createdAt: Date.now(),
+    };
+    await table.add([entry]);
+    console.log(`✅ Added: "${text}"`);
+  }
+  const finalCount = await table.countRows();
+  console.log(`\n📊 Final row count: ${finalCount}`);
+}
+
+async function testSemanticSearch(table, openai, query) {
+  console.log(`\n=== Testing Semantic Search: "${query}" ===\n`);
+  const response = await openai.embeddings.create({
+    model: memoryConfig.embedding.model,
+    input: query,
+    dimensions: memoryConfig.embedding.dimensions,
+  });
+  const queryEmbedding = response.data[0].embedding;
+  const results = await table.search(queryEmbedding).limit(3).toArray();
+  console.log(`✅ Semantic search completed`);
+  console.log(`🔍 Top ${results.length} results:\n`);
+  results.forEach((result, index) => {
+    const score = result.score ?? result._distance ?? 0;
+    console.log(`${index + 1}. [score/distance: ${score ? score.toFixed(4) : 'N/A'}] "${result.text}"`);
+  });
+  return results;
+}
+
+async function main() {
+  console.log("Starting memory-lancedb functionality test...\n");
+  const openai = new OpenAI({
+    apiKey: memoryConfig.embedding.apiKey,
+    baseURL: memoryConfig.embedding.baseUrl,
+  });
+  const { db, table } = await testLanceDBConnection();
+  const firstEmbedding = await testEmbeddingGeneration(openai);
+  await testInsertMemory(table, firstEmbedding);
+  await testMultipleMemories(table, openai);
+  await testVectorSearch(table, firstEmbedding);
+  await testSemanticSearch(table, openai, "框架功能测试");
+  await testSemanticSearch(table, openai, "阅读代码");
+  await testSemanticSearch(table, openai, "向量数据库存储");
+  console.log("\n🎉 All tests completed successfully!");
+  console.log("memory-lancedb plugin is working correctly.\n");
+  await db.close();
+}
+
+main().catch(err => {
+  console.error("\n❌ Test failed:", err);
+  process.exit(1);
+});
+EOF
 ```
 
-核心要点
+### 6.2 运行测试
 
-| 遵循的标准 | 位置                                     |
-| ---------- | ---------------------------------------- |
-| 用户插件   | /home/node/.openclaw/extensions/         |
-| 用户依赖   | /home/node/npm/node_modules/ + NODE_PATH |
-| 数据       | /home/node/.openclaw/memory/lancedb/     |
-| 内置代码   | /app/extensions/ 未修改                  |
+```bash
+cd /home/node/.openclaw/workspace
+node test-memory.js
+```
 
-安装完成 ✅
+### 6.3 预期输出
+
+所有步骤都显示 `✅`，最终输出：
+
+```
+🎉 All tests completed successfully!
+memory-lancedb plugin is working correctly.
+```
+
+如果看到这个，表示**安装成功，功能完全正常**。
+
+## 7. 常见问题解决
+
+### 问题 1: `Cannot find package '@lancedb/lancedb'`
+
+**原因**: NODE_PATH 环境变量没有正确配置
+
+**解决**:
+
+```bash
+# 添加到环境变量
+echo 'export NODE_PATH=/home/node/npm/node_modules:/home/node/bin:$NODE_PATH' >> ~/.profile
+echo 'export NODE_PATH=/home/node/npm/node_modules:/home/node/bin:$NODE_PATH' >> ~/.bashrc
+source ~/.profile
+```
+
+### 问题 2: 原生依赖包缺失
+
+**原因**: 自动安装未安装对应架构的可选依赖
+
+**解决** (Linux x86_64 示例):
+
+```bash
+cd /home/node/npm
+npm install @lancedb/lancedb-linux-x64-gnu --prefix /home/node/npm
+```
+
+### 问题 3: 搜索结果显示正常但 score 字段不存在
+
+这是因为 LanceDB v0.26+ 版本中，相似度分数字段已从 `score` 改名为 `_distance`。插件代码已经适配处理这个变化，不影响使用。
+
+### 问题 4: 维度不匹配
+
+**原因**: embedding 模型输出维度与配置不一致
+
+**解决**: 检查配置中的 `dimensions` 是否与使用的模型匹配：
+
+- BAAI/bge-large-zh-v1.5 → 1024
+- BAAI/bge-small-zh-v1.5 → 512
+
+## 最终目录结构
+
+```
+/home/node/
+├── .profile                       # NODE_PATH 已配置 ✓
+├── .bashrc                        # NODE_PATH 已配置 ✓
+├── npm/
+│   ├── node_modules/
+│   │   ├── @lancedb/
+│   │   │   ├── lancedb/           # LanceDB 主包 ✓
+│   │   │   └── lancedb-linux-x64-gnu/  # 原生依赖 ✓
+│   │   └── openai/                # OpenAI SDK ✓
+│   └── package.json
+└── .openclaw/
+    ├── openclaw.json              # 已配置 memory-lancedb ✓
+    ├── extensions/
+    ├── data/
+    └── memory/
+        └── lancedb/               # 向量数据库存储目录 ✓
+```
+
+## 路径标准遵循
+
+| 项目      | 位置                                   | 遵循标准           |
+| --------- | -------------------------------------- | ------------------ |
+| 插件代码  | `/app/extensions/memory-lancedb/`      | ✅ 只读内置，不修改 |
+| 依赖包    | `/home/node/npm/node_modules/`         | ✅ 遵循统一标准     |
+| NODE_PATH | 在 `~/.profile` 配置                   | ✅ 已配置           |
+| 数据存储  | `/home/node/.openclaw/memory/lancedb/` | ✅ 遵循标准         |
+
+## 验证命令
+
+```bash
+# 检查插件状态
+openclaw status | grep "memory"
+
+# 检查数据库大小
+du -sh /home/node/.openclaw/memory/lancedb/
+
+# 检查依赖安装
+ls -la /home/node/npm/node_modules/@lancedb/
+```
+
+## 安装完成
+
+✅ 安装完成，memory-lancedb 插件功能正常，可以使用向量记忆功能了。
+
+---
+
+**更新记录**:
+
+- 2026-03-20: 更新，添加了功能测试步骤和常见问题解决，适配 LanceDB v0.27.0
