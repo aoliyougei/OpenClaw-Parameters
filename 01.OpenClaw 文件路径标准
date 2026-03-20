@@ -28,6 +28,12 @@ mkdir -p /home/node/.openclaw/data
 mkdir -p /home/node/npm/node_modules
 ```
 
+**5. 创建临时文件目录**
+
+```bash
+mkdir -p /home/node/.openclaw/workspace/tmp
+```
+
 ## 第二步：配置环境变量（只需一次）
 
 **# 添加到三个位置确保加载**
@@ -48,7 +54,7 @@ echo 'export NODE_PATH="$NODE_PATH:/home/node/npm/node_modules"' >> ~/.bashrc
 echo 'export NODE_PATH="$NODE_PATH:/home/node/npm/node_modules"' >> ~/.openclaw/.profile
 ```
 
-## 第三步：安装依赖遵循的规则
+## 第三步：遵循规则
 
 | 场景             | 操作                                                         |
 | ---------------- | ------------------------------------------------------------ |
@@ -56,6 +62,7 @@ echo 'export NODE_PATH="$NODE_PATH:/home/node/npm/node_modules"' >> ~/.openclaw/
 | 内置插件缺依赖   | cd /home/node/npm && npm install <package-name> --prefix /home/node/npm |
 | 安装第三方插件   | 把插件放到 /home/node/.openclaw/extensions/<plugin-id>/，然后在 openclaw.json 中启用 |
 | 第三方插件缺依赖 | 同上，依赖装去 /home/node/npm/node_modules                   |
+| 临时文件         | 所有临时生成的文件全部都放置于/home/node/.openclaw/workspace/tmp |
 
 ## 第四步：完整目录结构（最终）
 
@@ -73,11 +80,12 @@ echo 'export NODE_PATH="$NODE_PATH:/home/node/npm/node_modules"' >> ~/.openclaw/
     ├── .profile # 环境变量（含 NODE_PATH）
     ├── openclaw.json # 主配置文件
     ├── extensions/ # 👉 用户安装的第三方插件
-    │ └── README.md # 本文档标准说明
+    │ 	└── README.md # 本文档标准说明
     ├── data/ # 👉 通用运行时数据
     ├── memory/ # 记忆数据
-    │ └── lancedb/ # memory-lancedb 向量数据库
+    │ 	└── lancedb/ # memory-lancedb 向量数据库
     └── workspace/ # 工作空间（日记、长期记忆）
+    		└── tmp/ # 所有临时文件
 ```
 
 ## 第五步：验证
@@ -94,11 +102,12 @@ openclaw status
 
 ## 判断规则（遵循 OpenClaw 文件路径标准）
 
-| 插件类型   | 判断依据                                | 安装路径                            | 命令                                                         |
-| ---------- | --------------------------------------- | ----------------------------------- | ------------------------------------------------------------ |
-| 内置插件   | 代码在 /app/extensions/                 | 依赖 → /home/node/npm/node_modules/ | cd /home/node/npm && npm install <package> --prefix /home/node/npm |
-| 第三方插件 | 代码在 /home/node/.openclaw/extensions/ | 依赖 → /home/node/npm/node_modules/ | 同上                                                         |
-| 二进制文件 | 可执行程序 → /home/node/bin             | /home/node/bin                      | 直接放置                                                     |
+| 插件类型   | 判断依据                                       | 安装路径                            | 命令                                                         |
+| ---------- | ---------------------------------------------- | ----------------------------------- | ------------------------------------------------------------ |
+| 内置插件   | 代码在 /app/extensions/                        | 依赖 → /home/node/npm/node_modules/ | cd /home/node/npm && npm install <package> --prefix /home/node/npm |
+| 第三方插件 | 代码在 /home/node/.openclaw/extensions/        | 依赖 → /home/node/npm/node_modules/ | 同上                                                         |
+| 二进制文件 | 可执行程序 → /home/node/bin                    | /home/node/bin                      | 直接放置                                                     |
+| 临时文件   | 所有发送给我的文件、下载的文件、测试使用的文件 | /home/node/.openclaw/workspace/tmp  | 直接放置                                                     |
 
 核心原则：
 
@@ -106,3 +115,4 @@ openclaw status
 2. 所有 npm 相关文件都在 /home/node/npm/ ✅
 3. 用户依赖都在 /home/node/npm/node_modules/ ✅
 4. 环境变量添加 /home/node/npm/node_modules 到 NODE_PATH ✅
+5. 所有临时使用的文件都放置在/home/node/.openclaw/workspace/tmp✅
