@@ -114,8 +114,6 @@ openclaw status
 │ Memory          │ enabled (plugin memory-lancedb)                                                                    │
 ```
 
-
-
 ### 6. 进阶优化配置（推荐）
 
 基础安装完成后，推荐开启以下两个优化功能，提升搜索性能和准确率。
@@ -157,7 +155,7 @@ openclaw status
 
 在 memory-lancedb 的 config 中添加 query.hybrid 配置：
 
-```bash
+```json
   "plugins": {
     "entries": {
       "memory-lancedb": {
@@ -470,11 +468,183 @@ cd /home/node/npm
 npm install @lancedb/lancedb-linux-x64-gnu --prefix /home/node/npm
 ```
 
-### 问题 3: 搜索结果显示正常但 score 字段不存在
+### 问题 3: 容器环境提示 `Cannot find module 'openai'`
+
+**原因**: 在容器化部署中，网关进程启动时没有加载用户 `~/.profile` 中的 `NODE_PATH` 环境变量，虽然配置了仍然找不到模块。
+
+**解决**:  
+创建符号链接，让 Node.js 可以直接找到：
+
+```bash
+mkdir -p /app/node_modules
+ln -sf /home/node/npm/node_modules/openai /app/node_modules/openai
+ln -sf /home/node/npm/node_modules/@lancedb /app/node_modules/@lancedb
+```
+
+验证链接：
+
+```bash
+ls -la /app/node_modules/ | grep -E "(openai|@lancedb)"
+```
+
+应该看到：
+
+```
+lrwxrwxrwx   1 node node    36 Mar 21 17:01 @lancedb -> /home/node/npm/node_modules/@lancedb
+lrwxrwxrwx   1 node node    34 Mar 21 17:01 openai -> /home/node/npm/node_modules/openai
+```
+
+### 问题 4: 提示 `memory config has unknown keys: cache, query` 或 `must NOT have additional properties`
+
+**原因**: 当前官方版本代码中，JSON Schema 和代码校验白名单都没有包含 `cache` 和 `query` 这两个新配置项，需要手动修改源码添加支持。
+
+**解决**: 需要修改两个文件：
+
+**1. 修改 `/app/extensions/memory-lancedb/openclaw.plugin.json`**
+
+在 `configSchema.properties` 中添加：
+
+```json
+{
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      // ... 已有配置保持不变 ...
+      "cache": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "enabled": { "type": "boolean" },
+          "maxEntries": { "type": "number", "minimum": 1000, "maximum": 200000 }
+        }
+      },
+      "query": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "hybrid": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "enabled": { "type": "boolean" },
+              "vectorWeight": { "type": "number" },
+              "textWeight": { "type": "number" },
+              "candidateMultiplier": { "type": "number" }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+在 `uiHints` 中添加：
+
+```json
+    "cache.enabled": {
+      "label": "Enable Embedding Cache",
+      "help": "Cache embedding results to avoid duplicate API calls",
+      "advanced": true
+    },
+    "cache.maxEntries": {
+      "label": "Cache Max Entries",
+      "help": "Maximum number of cached embeddings",
+      "advanced": true,
+      "placeholder": "50000"
+    },
+    "query.hybrid.enabled": {
+      "label": "Enable Hybrid Search",
+      "help": "Combine vector search with BM25 keyword search for better accuracy",
+      "advanced": true
+    }
+```
+
+**2. 修改 `/app/extensions/memory-lancedb/config.ts`**
+
+更新类型定义：
+
+```typescript
+export type MemoryConfig = {
+  // ... 已有保持不变 ...
+  cache?: {
+    enabled: boolean;
+    maxEntries: number;
+  };
+  query?: {
+    hybrid?: {
+      enabled: boolean;
+      vectorWeight: number;
+      textWeight: number;
+      candidateMultiplier: number;
+    };
+  };
+};
+```
+
+更新 `assertAllowedKeys` 白名单：
+
+```typescript
+assertAllowedKeys(
+  cfg,
+  ["embedding", "dbPath", "autoCapture", "autoRecall", "captureMaxChars", "cache", "query"],
+  "memory config",
+);
+```
+
+在 `return` 前添加解析逻辑：
+
+```typescript
+let cache: MemoryConfig["cache"];
+if (cfg.cache && typeof cfg.cache === "object") {
+  const c = cfg.cache as Record<string, unknown>;
+  cache = {
+    enabled: Boolean(c.enabled),
+    maxEntries: typeof c.maxEntries === "number" ? c.maxEntries : 50000,
+  };
+}
+
+let query: MemoryConfig["query"];
+if (cfg.query && typeof cfg.query === "object") {
+  const q = cfg.query as Record<string, unknown>;
+  if (q.hybrid && typeof q.hybrid === "object") {
+    const h = q.hybrid as Record<string, unknown>;
+    query = {
+      hybrid: {
+        enabled: Boolean(h.enabled),
+        vectorWeight: typeof h.vectorWeight === "number" ? h.vectorWeight : 0.7,
+        textWeight: typeof h.textWeight === "number" ? h.textWeight : 0.3,
+        candidateMultiplier: typeof h.candidateMultiplier === "number" ? h.candidateMultiplier : 4,
+      },
+    };
+  }
+}
+```
+
+更新返回对象：
+
+```typescript
+return {
+  // ... 已有保持不变 ...
+  cache,
+  query,
+};
+```
+
+修改完成后重新检查状态：
+
+```bash
+openclaw status
+```
+
+看到 `memory-lancedb: plugin registered` 表示成功。
+
+### 问题 5: 搜索结果显示正常但 score 字段不存在
 
 这是因为 LanceDB v0.26+ 版本中，相似度分数字段已从 `score` 改名为 `_distance`。插件代码已经适配处理这个变化，不影响使用。
 
-### 问题 4: 维度不匹配
+### 问题 6: 维度不匹配
 
 **原因**: embedding 模型输出维度与配置不一致
 
@@ -489,7 +659,9 @@ npm install @lancedb/lancedb-linux-x64-gnu --prefix /home/node/npm
 /home/node/
 ├── .profile                       # NODE_PATH 已配置 ✓
 ├── .bashrc                        # NODE_PATH 已配置 ✓
-├── npm/
+├── bin # 二进制文件
+├── tmp/ # 所有临时文件
+├── npm/                 # 👈 所有 npm 相关文件都在这里
 │   ├── node_modules/
 │   │   ├── @lancedb/
 │   │   │   ├── lancedb/           # LanceDB 主包 ✓
@@ -497,9 +669,10 @@ npm install @lancedb/lancedb-linux-x64-gnu --prefix /home/node/npm
 │   │   └── openai/                # OpenAI SDK ✓
 │   └── package.json
 └── .openclaw/
+    ├── .profile # 环境变量（含 NODE_PATH）
     ├── openclaw.json              # 已配置 memory-lancedb ✓
-    ├── extensions/
-    ├── data/
+    ├── extensions/ # 👉 用户安装的第三方插件
+    ├── data/ # 👉 通用运行时数据
     └── memory/
         └── lancedb/               # 向量数据库存储目录 ✓
 ```
@@ -535,3 +708,4 @@ ls -la /home/node/npm/node_modules/@lancedb/
 **更新记录**:
 
 - 2026-03-20: 更新，添加了功能测试步骤和常见问题解决，适配 LanceDB v0.27.0
+- 2026-03-21: 补充容器环境问题解决，添加缓存/混合搜索源码修改步骤
