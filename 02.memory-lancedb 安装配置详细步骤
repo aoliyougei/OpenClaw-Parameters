@@ -248,7 +248,7 @@ openclaw gateway restart
 ### 7.1 创建测试脚本
 
 ```bash
-cat > /home/node/tmp/test-memory.js << 'EOF'
+cat > /home/node/.openclaw/workspace/tmp/test-memory.js << 'EOF'
 /**
  * Test script for memory-lancedb plugin functionality
  */
@@ -419,7 +419,7 @@ EOF
 ### 7.2 运行测试
 
 ```bash
-cd /home/node/tmp/
+cd /home/node/.openclaw/workspace/tmp/
 node test-memory.js
 ```
 
@@ -439,7 +439,7 @@ memory-lancedb plugin is working correctly.
 测试成功后清理掉测试文件
 
 ```bash
-rm /home/node/tmp/test-memory.js
+rm /home/node/.openclaw/workspace/tmp/test-memory.js
 ```
 
 ## 8. 常见问题解决
