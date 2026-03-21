@@ -24,7 +24,7 @@ cd /home/node/npm
 npm install @lancedb/lancedb openai --prefix /home/node/npm
 ```
 
-### 重要说明：
+**重要说明：**
 
 - `@lancedb/lancedb` 会根据你的系统架构自动安装对应原生依赖包
 
@@ -79,7 +79,7 @@ ls -la /home/node/npm/node_modules/@lancedb/lancedb-linux-x64-gnu/
 }
 ```
 
-### 配置说明：
+**配置说明：**
 
 | 配置项        | 说明                                                         |
 | ------------- | ------------------------------------------------------------ |
@@ -114,11 +114,140 @@ openclaw status
 │ Memory          │ enabled (plugin memory-lancedb)                                                                    │
 ```
 
-## 6. 功能测试（必须执行）
+
+
+### 6. 进阶优化配置（推荐）
+
+基础安装完成后，推荐开启以下两个优化功能，提升搜索性能和准确率。
+
+### 6.1 开启向量搜索缓存
+
+向量搜索缓存可以避免重复计算相同文本块的嵌入向量，节省 API 调用次数和网络延迟。
+
+在 memory-lancedb 的 config 中添加 cache 配置：
+
+```json
+  "plugins": {
+    "entries": {
+      "memory-lancedb": {
+        "enabled": true,
+        "config": {
+// ... 已有基础配置保持不变
+          "cache": {
+            "enabled": true,
+            "maxEntries": 50000
+          }
+        }
+      }
+    },
+```
+
+配置说明：
+
+| 配置项     | 说明                                                 |
+| ---------- | ---------------------------------------------------- |
+| enabled    | 是否开启缓存，默认 false，需要显式开启               |
+| maxEntries | 最大缓存条目数，超过后自动淘汰旧条目，推荐设置 50000 |
+
+效果： 记忆文件更新时，未更改的文本块会直接使用缓存的嵌入向量，无需重复调用 API，加快索引构建速度。
+
+### 6.2 开启混合搜索（BM25 + 向量）
+
+混合搜索结合向量相似度和关键词匹配，大幅提升搜索准确率，特别是对于包含 ID、错误信息、代码符号等精确关键词的场景。
+
+在 memory-lancedb 的 config 中添加 query.hybrid 配置：
+
+```bash
+  "plugins": {
+    "entries": {
+      "memory-lancedb": {
+        "enabled": true,
+        "config": {
+// ... 已有基础配置保持不变
+          "query": {
+            "hybrid": {
+              "enabled": true,
+              "vectorWeight": 0.7,
+              "textWeight": 0.3,
+              "candidateMultiplier": 4
+            }
+          }
+        }
+      }
+    },
+```
+
+配置说明：
+
+| 配置项              | 说明                                       |
+| ------------------- | ------------------------------------------ |
+| enabled             | 是否开启混合搜索，默认 false，需要显式开启 |
+| vectorWeight        | 向量相似度权重，推荐 0.7（偏向语义搜索）   |
+| textWeight          | 关键词权重，推荐 0.3                       |
+| candidateMultiplier | 候选池倍数，默认 4，无需修改               |
+
+两种搜索方式优势互补：
+
+· 向量搜索：擅长语义理解，同义词、不同措辞也能匹配
+· BM25 关键词搜索：擅长精确匹配 ID、错误信息、代码符号
+
+开启后自动生效，无需额外操作，搜索结果会更精准。
+
+### 6.3 完整配置示例
+
+开启缓存和混合搜索后的完整配置：
+
+```json
+  "plugins": {
+    "slots": {
+      "memory": "memory-lancedb"
+    },
+    "entries": {
+      "wecom-openclaw-plugin": {
+        "enabled": true
+      },
+      "memory-lancedb": {
+        "enabled": true,
+        "config": {
+          "embedding": {
+            "apiKey": "YOURAPIKEY",
+            "model": "BAAI/bge-large-zh-v1.5",
+            "baseUrl": "https://api.siliconflow.cn/v1",
+            "dimensions": 1024
+          },
+          "autoCapture": true,
+          "autoRecall": true,
+          "captureMaxChars": 500,
+          "cache": {
+            "enabled": true,
+            "maxEntries": 50000
+          },
+          "query": {
+            "hybrid": {
+              "enabled": true,
+              "vectorWeight": 0.7,
+              "textWeight": 0.3,
+              "candidateMultiplier": 4
+            }
+          }
+        }
+      }
+    },
+```
+
+6.4 重启生效
+
+配置修改后需要重启 OpenClaw Gateway 生效：
+
+```bash
+openclaw gateway restart
+```
+
+## 7. 功能测试（必须执行）
 
 安装完成后需要进行实际功能测试，验证写入和搜索是否正常工作：
 
-### 6.1 创建测试脚本
+### 7.1 创建测试脚本
 
 ```bash
 cat > /home/node/tmp/test-memory.js << 'EOF'
@@ -289,14 +418,14 @@ main().catch(err => {
 EOF
 ```
 
-### 6.2 运行测试
+### 7.2 运行测试
 
 ```bash
 cd /home/node/tmp/
 node test-memory.js
 ```
 
-### 6.3 预期输出
+### 7.3 预期输出
 
 所有步骤都显示 `✅`，最终输出：
 
@@ -307,7 +436,7 @@ memory-lancedb plugin is working correctly.
 
 如果看到这个，表示**安装成功，功能完全正常**。
 
-### 6.4 成功清理
+### 7.4 成功清理
 
 测试成功后清理掉测试文件
 
@@ -315,7 +444,7 @@ memory-lancedb plugin is working correctly.
 rm /home/node/tmp/test-memory.js
 ```
 
-## 7. 常见问题解决
+## 8. 常见问题解决
 
 ### 问题 1: `Cannot find package '@lancedb/lancedb'`
 
