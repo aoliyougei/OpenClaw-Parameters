@@ -476,7 +476,7 @@ npm install @lancedb/lancedb-linux-x64-gnu --prefix /home/node/npm
 创建符号链接，让 Node.js 可以直接找到：
 
 ```bash
-mkdir -p /app/node_modules
+mkdir -p /home/node/npm/node_modules
 ln -sf /home/node/npm/node_modules/openai /app/node_modules/openai
 ln -sf /home/node/npm/node_modules/@lancedb /app/node_modules/@lancedb
 ```
