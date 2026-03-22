@@ -6,7 +6,7 @@
 
 - OpenClaw 已按照标准路径安装
 - Node.js v18+ 已安装
-- 已配置 `NODE_PATH` 环境变量（包含 `/home/node/npm/node_modules`）
+- 已配置 `NODE_PATH` 环境变量（包含 `/home/node/.openclaw/npm/node_modules`）
 
 ## 1. 创建所需目录结构
 
@@ -17,11 +17,11 @@ mkdir -p /home/node/.openclaw/memory/lancedb
 
 ## 2. 安装依赖包
 
-按照路径标准，依赖包安装到 `/home/node/npm/node_modules/`
+按照路径标准，依赖包安装到 `/home/node/.openclaw/npm/node_modules/`
 
 ```bash
-cd /home/node/npm
-npm install @lancedb/lancedb openai --prefix /home/node/npm
+cd /home/node/.openclaw/npm/
+npm install @lancedb/lancedb openai --prefix /home/node/.openclaw/npm/
 ```
 
 **重要说明：**
@@ -255,8 +255,8 @@ cat > /home/node/.openclaw/workspace/tmp/test-memory.js << 'EOF'
 
 import { randomUUID } from "node:crypto";
 import fs from "node:fs";
-import lancedb from "/home/node/npm/node_modules/@lancedb/lancedb/dist/index.js";
-import OpenAI from "/home/node/npm/node_modules/openai/index.mjs";
+import lancedb from "/home/node/.openclaw/npm/node_modules/@lancedb/lancedb/dist/index.js";
+import OpenAI from "/home/node/.openclaw/npm/node_modules/openai/index.mjs";
 
 const config = JSON.parse(fs.readFileSync("/home/node/.openclaw/openclaw.json", "utf8"));
 const memoryConfig = config.plugins.entries["memory-lancedb"].config;
@@ -452,8 +452,8 @@ rm /home/node/.openclaw/workspace/tmp/test-memory.js
 
 ```bash
 # 添加到环境变量
-echo 'export NODE_PATH=/home/node/npm/node_modules:/home/node/bin:$NODE_PATH' >> ~/.profile
-echo 'export NODE_PATH=/home/node/npm/node_modules:/home/node/bin:$NODE_PATH' >> ~/.bashrc
+echo 'export NODE_PATH=/home/node/.openclaw/npm/node_modules:/home/node/bin:$NODE_PATH' >> ~/.profile
+echo 'export NODE_PATH=/home/node/.openclaw/npm/node_modules:/home/node/bin:$NODE_PATH' >> ~/.bashrc
 source ~/.profile
 ```
 
@@ -464,8 +464,8 @@ source ~/.profile
 **解决** (Linux x86_64 示例):
 
 ```bash
-cd /home/node/npm
-npm install @lancedb/lancedb-linux-x64-gnu --prefix /home/node/npm
+cd /home/node/.openclaw/npm
+npm install @lancedb/lancedb-linux-x64-gnu --prefix /home/node/.openclaw/npm
 ```
 
 ### 问题 3: 容器环境提示 `Cannot find module 'openai'`
@@ -476,9 +476,9 @@ npm install @lancedb/lancedb-linux-x64-gnu --prefix /home/node/npm
 创建符号链接，让 Node.js 可以直接找到：
 
 ```bash
-mkdir -p /home/node/npm/node_modules
-ln -sf /home/node/npm/node_modules/openai /app/node_modules/openai
-ln -sf /home/node/npm/node_modules/@lancedb /app/node_modules/@lancedb
+mkdir -p /home/node/.openclaw/npm/node_modules
+ln -sf /home/node/.openclaw/npm/node_modules/openai /app/node_modules/openai
+ln -sf /home/node/.openclaw/npm/node_modules/@lancedb /app/node_modules/@lancedb
 ```
 
 验证链接：
@@ -490,8 +490,8 @@ ls -la /app/node_modules/ | grep -E "(openai|@lancedb)"
 应该看到：
 
 ```
-lrwxrwxrwx   1 node node    36 Mar 21 17:01 @lancedb -> /home/node/npm/node_modules/@lancedb
-lrwxrwxrwx   1 node node    34 Mar 21 17:01 openai -> /home/node/npm/node_modules/openai
+lrwxrwxrwx   1 node node    36 Mar 21 17:01 @lancedb -> /home/node/.openclaw/npm/node_modules/@lancedb
+lrwxrwxrwx   1 node node    34 Mar 21 17:01 openai -> /home/node/.openclaw/npm/node_modules/openai
 ```
 
 ### 问题 4: 提示 `memory config has unknown keys: cache, query` 或 `must NOT have additional properties`
@@ -679,12 +679,12 @@ openclaw status
 
 ## 路径标准遵循
 
-| 项目      | 位置                                   | 遵循标准           |
-| --------- | -------------------------------------- | ------------------ |
-| 插件代码  | `/app/extensions/memory-lancedb/`      | ✅ 只读内置，不修改 |
-| 依赖包    | `/home/node/npm/node_modules/`         | ✅ 遵循统一标准     |
-| NODE_PATH | 在 `~/.profile` 配置                   | ✅ 已配置           |
-| 数据存储  | `/home/node/.openclaw/memory/lancedb/` | ✅ 遵循标准         |
+| 项目      | 位置                                     | 遵循标准           |
+| --------- | ---------------------------------------- | ------------------ |
+| 插件代码  | `/app/extensions/memory-lancedb/`        | ✅ 只读内置，不修改 |
+| 依赖包    | `/home/node/.openclaw/npm/node_modules/` | ✅ 遵循统一标准     |
+| NODE_PATH | 在 `~/.profile` 配置                     | ✅ 已配置           |
+| 数据存储  | `/home/node/.openclaw/memory/lancedb/`   | ✅ 遵循标准         |
 
 ## 验证命令
 
@@ -696,7 +696,7 @@ openclaw status | grep "memory"
 du -sh /home/node/.openclaw/memory/lancedb/
 
 # 检查依赖安装
-ls -la /home/node/npm/node_modules/@lancedb/
+ls -la /home/node/.openclaw/npm/node_modules/@lancedb/
 ```
 
 ## 安装完成
