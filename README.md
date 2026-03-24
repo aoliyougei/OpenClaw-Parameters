@@ -23,8 +23,8 @@ https://github.com/aoliyougei/OpenClaw-Parameters/blob/main/01.OpenClaw%20%E6%96
 
 ## 03 记忆最佳实践
 ```bash
-请读取以下文档，并将其作为当前 OpenClaw 容器环境的标准路径规范来落地执行：
-请阅读 workspace 中的《OpenClaw 记忆最佳实践》文档，并将其作为你的记忆工作规范。
+请阅读以下文档，并将其作为你的记忆工作规范：
+https://github.com/aoliyougei/OpenClaw-Parameters/blob/main/03.OpenClaw%20%E8%AE%B0%E5%BF%86%E6%9C%80%E4%BD%B3%E5%AE%9E%E8%B7%B5
 具体要求：
 1. 提炼其中适合作为长期执行规则的内容，写入  ⁠AGENTS.md⁠ 
 2. 按文档结构初始化或整理  ⁠MEMORY.md⁠ 
