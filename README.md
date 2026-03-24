@@ -29,7 +29,7 @@
 
 ## 01 OpenClaw 文件路径标准
 ```bash
-请读取以下文档，并将其作为当前 OpenClaw 容器环境的标准路径规范来落地执行：
+请读取以下链接文档，并将其作为当前 OpenClaw 容器环境的标准路径规范来落地执行：
 https://github.com/aoliyougei/OpenClaw-Parameters/blob/main/01.OpenClaw%20%E6%96%87%E4%BB%B6%E8%B7%AF%E5%BE%84%E6%A0%87%E5%87%86
 具体要求：
 1. 提炼文档中的核心路径标准，包括：标准根目录、配置文件路径、状态目录、workspace、插件目录、npm 依赖目录、bin 目录、临时文件目录、持久文件目录、环境变量规则
