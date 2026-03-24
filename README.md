@@ -39,7 +39,6 @@ https://github.com/aoliyougei/OpenClaw-Parameters/blob/main/02.OpenClaw%20%E5%90
  ⦁已完成的测试项
  ⦁尚需人工处理的步骤
  ⦁验证方法
-目标不是总结文档，而是让当前 OpenClaw 尽可能达到文档中描述的实际效果。
 ```
 
 
