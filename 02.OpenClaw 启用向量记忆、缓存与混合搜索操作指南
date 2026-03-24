@@ -44,7 +44,7 @@
         "model": "Qwen/Qwen3-Embedding-8B",
         "remote": {
           "baseUrl": "https://api.siliconflow.cn/v1",
-          "apiKey": "YOUR_SILICONFLOW_API_KEY"
+          "apiKey": "${EMBEDDING_API_KEY}"
         },
         "sync": {
           "watch": true
@@ -89,9 +89,7 @@ https://api.siliconflow.cn/v1
 
 ### 5. `remote.apiKey`
 
-填写 SiliconFlow API Key。
-
-> 更推荐后续改为环境变量或 SecretRef，不建议长期明文写入配置文件。
+已配置环境变量：EMBEDDING_API_KEY。
 
 ### 6. `sync.watch: true`
 
