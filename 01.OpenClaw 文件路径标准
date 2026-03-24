@@ -1,345 +1,105 @@
-# OpenClaw 容器环境统一标准路径指南（2026.3.22+）
+# OpenClaw 容器环境补充路径规范（2026.3.22+）
 
-## 1. 文档目标
+## 1. 文档目的
 
-本指南仅用于在 **OpenClaw 容器环境** 中建立一套统一、可复制、适配 `2026.3.22` 及后续版本的标准路径方案。
+本文档用于补充说明 OpenClaw `2026.3.22+` 容器环境下，仍需显式统一或容易混用的路径规则。
 
-本文档不讨论 memory 配置、向量检索、缓存或混合搜索，仅聚焦：
+对于当前版本中已经默认采用、且环境内通常已存在的标准路径，不再重复展开说明。本文档仅保留以下内容：
 
-- 配置文件标准路径
-- 状态目录标准路径
-- workspace 标准路径
-- 插件目录标准路径
-- npm 用户依赖目录标准路径
-- 用户二进制目录标准路径
-- 临时文件与持久文件标准路径
-- 环境变量标准写法
-- 容器环境下的只读/可写边界
-
-> 结论先说：
-> **从 OpenClaw 2026.3.22 起，在容器环境中应统一以 `/home/node/.openclaw` 作为唯一标准根路径。**
+- 需要补齐的目录规范
+- 仍建议显式设置的环境变量
+- 容器内置目录与用户目录边界
+- 安装与文件落盘规则
+- AGENTS.md 推荐长期规则
+- 验证方法
 
 ---
 
-## 2. 适用范围
+## 2. 基本原则
 
-适用于以下场景：
+OpenClaw 容器环境继续遵循以下单一原则：
 
-- Docker / 容器化部署 OpenClaw
-- 以 `node` 用户运行 OpenClaw
-- 需要长期维护、可复制、可迁移的实例
-- 需要统一插件、依赖、缓存、状态目录、workspace、输出目录的环境
-
-默认用户主目录：
-
-```bash
-/home/node
-```
-
-统一标准根路径：
+- 所有用户可写资源统一归拢到：
 
 ```bash
 /home/node/.openclaw
 ```
 
----
-
-## 3. 为什么 2026.3.22 后必须统一路径
-
-根据 OpenClaw `2026.3.22` 的版本变化：
-
-### 3.1 旧 `.moltbot` 路径体系已不再推荐
-
-官方已移除：
-
-- `.moltbot`
-- `moltbot.json`
-- 旧状态目录自动探测/迁移 fallback
-
-因此：
-
-- 不应继续依赖旧 moltbot 路径习惯
-- 容器环境中应统一收敛到：
-
-```bash
-/home/node/.openclaw
-```
-
-### 3.2 路径控制统一使用 `OPENCLAW_*`
-
-如需显式指定路径，应使用：
-
-- `OPENCLAW_STATE_DIR`
-- `OPENCLAW_CONFIG_PATH`
-
-不要再使用：
-
-- `CLAWDBOT_*`
-- `MOLTBOT_*`
-
-### 3.3 容器中应区分内置目录与用户目录
-
-建议明确边界：
-
-- `/app/...`：镜像内置目录，默认只读
-- `/home/node/.openclaw/...`：用户态目录，统一可写
+- `/app/...` 视为镜像内置目录，默认只读
+- 用户扩展、用户依赖、用户二进制、运行数据、临时文件、持久文件应彼此分离
+- 路径控制统一使用 `OPENCLAW_*`
+- 不再使用 `.moltbot`、`moltbot.json`、`CLAWDBOT_*`、`MOLTBOT_*` 旧约定
 
 ---
 
-## 4. 统一标准路径定义
+## 3. 需要显式统一的补充目录
 
-### 4.1 OpenClaw 标准根目录
+以下目录建议在容器环境中显式创建并长期保留。
 
-```bash
-/home/node/.openclaw
-```
-
-所有用户可写状态、配置、扩展、workspace、输出文件等都应统一归拢到该目录。
-
----
-
-### 4.2 主配置文件路径
-
-统一使用：
-
-```bash
-/home/node/.openclaw/openclaw.json
-```
-
-如需显式指定：
-
-```bash
-export OPENCLAW_CONFIG_PATH=/home/node/.openclaw/openclaw.json
-```
-
----
-
-### 4.3 状态目录路径
-
-统一使用：
-
-```bash
-/home/node/.openclaw
-```
-
-如需显式指定：
-
-```bash
-export OPENCLAW_STATE_DIR=/home/node/.openclaw
-```
-
-> 在容器中，推荐直接把整个 `/home/node/.openclaw` 做成持久卷挂载点。
-
----
-
-### 4.4 Workspace 路径
-
-统一使用：
-
-```bash
-/home/node/.openclaw/workspace
-```
-
-这是 agent 的主工作区。
-
----
-
-### 4.5 第三方插件目录
-
-统一使用：
-
-```bash
-/home/node/.openclaw/extensions/<plugin-id>/
-```
-
-示例：
-
-```bash
-/home/node/.openclaw/extensions/my-plugin/
-```
-
----
-
-### 4.6 用户 npm 依赖目录
-
-统一 npm 工作目录：
-
-```bash
-/home/node/.openclaw/npm
-```
-
-统一 `node_modules`：
-
-```bash
-/home/node/.openclaw/npm/node_modules
-```
-
-推荐安装方式：
-
-```bash
-cd /home/node/.openclaw/npm
-npm install <package-name> --prefix /home/node/.openclaw/npm
-```
-
----
-
-### 4.7 用户二进制目录
-
-统一使用：
+### 3.1 用户二进制目录
 
 ```bash
 /home/node/.openclaw/bin
 ```
 
-适用于：
+用于放置用户自行补装的 CLI、脚本或辅助工具。
 
-- ffmpeg
-- 7zz
-- 自定义脚本
-- 各类自行补装的 CLI 工具
-
----
-
-### 4.8 通用运行数据目录
-
-统一使用：
+### 3.2 通用运行数据目录
 
 ```bash
 /home/node/.openclaw/data
 ```
 
-适用于：
+用于放置不属于 workspace 文档、但需要长期保留的运行数据。
 
-- 插件辅助数据
-- 运行期通用数据
-- 需要保留但不属于 workspace 文档的数据
+### 3.3 用户 npm 依赖目录
 
----
+```bash
+/home/node/.openclaw/npm
+/home/node/.openclaw/npm/node_modules
+```
 
-### 4.9 临时文件目录
+用于安装用户级 Node.js 依赖，避免改动 `/app` 内置内容。
 
-统一使用：
+### 3.4 临时文件目录
 
 ```bash
 /home/node/.openclaw/workspace/tmp
 ```
 
-适用于：
+用于：
 
 - 临时下载文件
 - 中间处理文件
-- 一次性调试文件
-- 临时导出文件
+- 调试产物
+- 一次性导出文件
 
----
-
-### 4.10 持久保存文件目录
-
-统一使用：
+### 3.5 持久文件目录
 
 ```bash
 /home/node/.openclaw/workspace/data
 ```
 
-适用于：
+用于：
 
-- 用户明确要求保存的文件
+- 用户要求长期保存的文件
 - 正式导出文件
-- 长期归档文件
-- 后续还会继续使用的结果文件
+- 归档文件
+- 后续仍需继续使用的成果文件
 
----
-
-## 5. 内置目录与用户目录边界
-
-容器中常见内置目录：
+### 3.6 定时任务目录
 
 ```bash
-/app
+/home/node/.openclaw/cron
 ```
 
-例如：
-
-- `/app/docs`
-- `/app/extensions`
-- `/app/skills`
-
-统一处理原则：
-
-1. `/app/...` 默认视为只读
-2. 不直接修改内置目录源码
-3. 用户自定义内容统一写入 `/home/node/.openclaw/...`
-4. 内置插件若缺依赖，优先在用户目录补依赖，而不是改内置目录
+用于放置后续需要持久化管理的定时任务相关内容。
 
 ---
 
-## 6. 推荐目录结构
+## 4. 环境变量规则
 
-```bash
-/home/node/
-└── .openclaw/
-    ├── openclaw.json
-    ├── bin/
-    ├── data/
-    ├── npm/
-    │   ├── package.json
-    │   ├── package-lock.json
-    │   └── node_modules/
-    ├── extensions/
-    │   └── <plugin-id>/
-    ├── agents/
-    ├── logs/
-    ├── workspace/
-    │   ├── AGENTS.md
-    │   ├── SOUL.md
-    │   ├── USER.md
-    │   ├── TOOLS.md
-    │   ├── tmp/
-    │   └── data/
-    └── cron/
-```
-
----
-
-## 7. 初始化标准路径
-
-### 7.1 创建目录
-
-```bash
-mkdir -p /home/node/.openclaw/bin
-mkdir -p /home/node/.openclaw/data
-mkdir -p /home/node/.openclaw/extensions
-mkdir -p /home/node/.openclaw/npm/node_modules
-mkdir -p /home/node/.openclaw/workspace/tmp
-mkdir -p /home/node/.openclaw/workspace/data
-```
-
----
-
-### 7.2 初始化 npm 工作目录
-
-```bash
-cat >/home/node/.openclaw/npm/package.json <<'EOF'
-{
-  "name": "openclaw-user-npm",
-  "private": true,
-  "description": "User-scoped npm packages for OpenClaw runtime"
-}
-EOF
-```
-
----
-
-### 7.3 推荐环境变量写法
-
-建议写入：
-
-- `/home/node/.profile`
-- `/home/node/.bashrc`
-- 容器启动脚本
-- Docker Compose `environment`
-
-推荐内容：
+建议在容器启动脚本、Compose `environment` 或用户 shell 环境中显式设置：
 
 ```bash
 export OPENCLAW_STATE_DIR=/home/node/.openclaw
@@ -348,45 +108,67 @@ export PATH="/home/node/.openclaw/bin:$PATH"
 export NODE_PATH="/home/node/.openclaw/npm/node_modules${NODE_PATH:+:$NODE_PATH}"
 ```
 
-### 7.4 说明
+### 说明
 
-- `PATH`：用于查找可执行程序，因此放 `bin`
-- `NODE_PATH`：用于 Node.js 模块查找，因此只放 `node_modules`
-
-> 不建议把 `/home/node/.openclaw/bin` 写进 `NODE_PATH`。
+- `PATH` 只负责查找二进制
+- `NODE_PATH` 只负责查找 Node.js 模块
+- 不建议把 `bin` 写入 `NODE_PATH`
 
 ---
 
-## 8. 安装与扩展规则
+## 5. 内置目录与用户目录边界
 
-### 8.1 安装用户二进制
+容器内常见内置目录：
 
-统一放置：
+```bash
+/app
+```
+
+处理原则：
+
+1. `/app/...` 默认视为只读
+2. 不直接修改内置目录源码
+3. 用户自定义内容统一写入 `/home/node/.openclaw/...`
+4. 内置插件缺依赖时，优先在用户 npm 目录补依赖
+
+---
+
+## 6. 安装与使用规则
+
+### 6.1 安装用户二进制
+
+统一放入：
 
 ```bash
 /home/node/.openclaw/bin
 ```
 
-### 8.2 安装第三方插件
+### 6.2 安装第三方插件
 
-统一放置：
+统一放入：
 
 ```bash
 /home/node/.openclaw/extensions/<plugin-id>/
 ```
 
-### 8.3 安装 npm 用户依赖
+### 6.3 安装用户 npm 依赖
 
-统一方式：
+统一在：
+
+```bash
+/home/node/.openclaw/npm
+```
+
+执行方式：
 
 ```bash
 cd /home/node/.openclaw/npm
 npm install <package-name> --prefix /home/node/.openclaw/npm
 ```
 
-### 8.4 内置插件缺依赖时
+### 6.4 内置插件缺依赖时
 
-不要改 `/app/extensions/`，只补用户依赖：
+不要修改 `/app/extensions/`，只补用户依赖：
 
 ```bash
 cd /home/node/.openclaw/npm
@@ -395,58 +177,47 @@ npm install <package-name> --prefix /home/node/.openclaw/npm
 
 ---
 
-## 9. 文件使用规则
+## 7. 文件落盘规则
 
-### 9.1 临时文件
+### 7.1 临时文件
 
-以下情况统一放：
+统一放入：
 
 ```bash
 /home/node/.openclaw/workspace/tmp
 ```
 
-包括：
+### 7.2 持久文件
 
-- 临时下载
-- 中间处理产物
-- 调试文件
-- 临时导出文件
-
-### 9.2 持久文件
-
-以下情况统一放：
+统一放入：
 
 ```bash
 /home/node/.openclaw/workspace/data
 ```
 
-包括：
+规则：
 
-- 用户要求长期保存的文件
-- 正式导出文件
-- 归档文件
-- 后续还要继续使用的成果文件
+- 临时文件与持久文件必须分离
+- 需要长期保留的结果，不应写入 `tmp`
+- 一次性处理产物，不应混入 `data`
 
 ---
 
-## 10. AGENTS.md 推荐补充规则
+## 8. AGENTS.md 推荐补充规则
 
-建议在 workspace 的 `AGENTS.md` 中加入以下标准：
+建议在 workspace 的 `AGENTS.md` 中补充：
 
 ```md
-## OpenClaw 容器标准路径
+## OpenClaw 容器标准路径补充规则
 
-遵循以下统一标准路径：
+遵循以下补充规范：
 
-- OpenClaw 状态根目录：`/home/node/.openclaw`
-- 主配置文件：`/home/node/.openclaw/openclaw.json`
-- Workspace：`/home/node/.openclaw/workspace`
-- 第三方插件：`/home/node/.openclaw/extensions/<plugin-id>/`
-- 用户 npm 依赖：`/home/node/.openclaw/npm/node_modules`
 - 用户二进制：`/home/node/.openclaw/bin`
+- 用户 npm 依赖：`/home/node/.openclaw/npm/node_modules`
 - 通用运行数据：`/home/node/.openclaw/data`
 - 临时文件：`/home/node/.openclaw/workspace/tmp`
 - 持久文件：`/home/node/.openclaw/workspace/data`
+- 定时任务目录：`/home/node/.openclaw/cron`
 
 规则：
 
@@ -454,15 +225,15 @@ npm install <package-name> --prefix /home/node/.openclaw/npm
 2. 所有用户可写资源统一归拢到 `/home/node/.openclaw/`
 3. 二进制走 `PATH`，Node 模块走 `NODE_PATH`
 4. 临时文件与持久文件必须分离
-5. 新版 OpenClaw 统一使用 `OPENCLAW_STATE_DIR` / `OPENCLAW_CONFIG_PATH`
+5. 统一使用 `OPENCLAW_STATE_DIR` / `OPENCLAW_CONFIG_PATH`
 6. 不再使用 `.moltbot`、`moltbot.json`、`CLAWDBOT_*`、`MOLTBOT_*` 旧约定
 ```
 
 ---
 
-## 11. 验证步骤
+## 9. 验证方法
 
-### 11.1 验证环境变量
+### 9.1 验证环境变量
 
 ```bash
 echo "$OPENCLAW_STATE_DIR"
@@ -471,111 +242,37 @@ echo "$PATH"
 echo "$NODE_PATH"
 ```
 
-预期：
-
-- `OPENCLAW_STATE_DIR=/home/node/.openclaw`
-- `OPENCLAW_CONFIG_PATH=/home/node/.openclaw/openclaw.json`
-- `PATH` 中包含 `/home/node/.openclaw/bin`
-- `NODE_PATH` 中包含 `/home/node/.openclaw/npm/node_modules`
-
----
-
-### 11.2 验证标准目录
+### 9.2 验证目录
 
 ```bash
-ls -l /home/node/.openclaw/openclaw.json
-ls -ld /home/node/.openclaw/workspace
-ls -ld /home/node/.openclaw/extensions
-ls -ld /home/node/.openclaw/npm/node_modules
 ls -ld /home/node/.openclaw/bin
+ls -ld /home/node/.openclaw/data
+ls -ld /home/node/.openclaw/npm/node_modules
+ls -ld /home/node/.openclaw/workspace/tmp
+ls -ld /home/node/.openclaw/workspace/data
+ls -ld /home/node/.openclaw/cron
 ```
 
----
-
-### 11.3 验证 OpenClaw 状态
+### 9.3 验证运行状态
 
 ```bash
 openclaw gateway status
-```
-
-如需查看更多：
-
-```bash
 openclaw status
 ```
 
 ---
 
-## 12. 常见错误与规避建议
+## 10. 核心结论
 
-### 错误 1：继续使用旧 `.moltbot` 路径
+在 OpenClaw `2026.3.22+` 容器环境中：
 
-规避：
-
-- 统一迁移到 `/home/node/.openclaw`
-- 使用 `OPENCLAW_STATE_DIR` / `OPENCLAW_CONFIG_PATH`
-
-### 错误 2：把二进制目录写进 NODE_PATH
-
-规避：
-
-- 二进制目录走 `PATH`
-- Node 模块目录走 `NODE_PATH`
-
-### 错误 3：内置目录与用户目录混写
-
-规避：
-
-- `/app/...` 默认只读
-- 用户自定义内容只放 `~/.openclaw`
-
-### 错误 4：临时文件和持久文件混放
-
-规避：
-
-- 临时文件进 `workspace/tmp`
-- 保存文件进 `workspace/data`
-
-### 错误 5：插件目录、依赖目录、二进制目录混用
-
-规避：
-
-- 插件：`extensions/`
-- npm 依赖：`npm/node_modules`
-- 二进制：`bin/`
-
----
-
-## 13. 核心结论
-
-在 OpenClaw `2026.3.22+` 的容器环境中，推荐采用以下单一标准：
-
-- 所有用户可写资源统一归拢到：
+- 已存在的标准路径不再重复展开
+- 仅对容易缺失、容易混用的目录和环境变量做补充规范
+- 所有用户可写资源继续统一归拢到：
 
 ```bash
 /home/node/.openclaw
 ```
 
-- 主配置文件：
-
-```bash
-/home/node/.openclaw/openclaw.json
-```
-
-- 状态目录：
-
-```bash
-/home/node/.openclaw
-```
-
-- Workspace：
-
-```bash
-/home/node/.openclaw/workspace
-```
-
-- 第三方插件、npm 依赖、二进制、临时文件、持久文件分目录管理
-- 使用 `OPENCLAW_*` 环境变量
-- 不再延续 `.moltbot`、`moltbot.json`、`CLAWDBOT_*`、`MOLTBOT_*` 旧约定
-
-这套方案最适合在容器环境中长期维护 OpenClaw，并能与 `2026.3.22+` 的官方路径演进保持一致。
+- 用户二进制、用户依赖、运行数据、临时文件、持久文件应长期分目录管理
+- 新增内容优先写入用户目录，不修改 `/app` 内置目录
