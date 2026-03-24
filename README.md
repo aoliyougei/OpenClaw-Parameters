@@ -16,7 +16,6 @@ https://github.com/aoliyougei/OpenClaw-Parameters/blob/main/01.OpenClaw%20%E6%96
  ⦁已修改的文件和目录
  ⦁仍需人工执行的步骤
  ⦁验证方法
-目标不是总结这份文档，而是让当前 OpenClaw 环境尽可能达到文档中描述的标准效果。
 ```
 
 ## 02 启用向量模型、缓存和混合搜索
