@@ -1,77 +1,61 @@
-# memory-lancedb 向量记忆插件 安装配置详细步骤
+# OpenClaw 启用向量记忆、缓存与混合搜索操作指南（SiliconFlow / Qwen3-Embedding-8B）
 
-遵循 OpenClaw 文件路径标准，结合实际测试验证，完整安装步骤如下：
+## 目标
 
-## 前置条件
+本文档用于在 OpenClaw 中启用以下能力：
 
-- OpenClaw 已按照标准路径安装
-- Node.js v18+ 已安装
-- 已配置 `NODE_PATH` 环境变量（包含 `/home/node/.openclaw/npm/node_modules`）
+- 向量记忆检索（Vector Search）
+- 索引缓存 / 文件监听增量更新（Watch + Cache）
+- 混合搜索（BM25 + Vector Hybrid Search）
 
-## 1. 创建所需目录结构
+本文采用：
 
-```bash
-# 创建向量数据库存储目录
-mkdir -p /home/node/.openclaw/memory/lancedb
-```
+- 向量模型：`Qwen/Qwen3-Embedding-8B`
+- OpenAI-compatible API Base URL：`https://api.siliconflow.cn/v1`
 
-## 2. 安装依赖包
+> 说明：OpenClaw 官方 memory 配置支持使用 `provider: "openai"` 对接自定义 OpenAI-compatible embeddings endpoint。
 
-按照路径标准，依赖包安装到 `/home/node/.openclaw/npm/node_modules/`
+---
 
-```bash
-cd /home/node/.openclaw/npm/
-npm install @lancedb/lancedb openai --prefix /home/node/.openclaw/npm/
-```
+## 一、前置条件
 
-**重要说明：**
+1. OpenClaw 已正常运行
+2. 可访问 OpenClaw 主配置文件（常见路径：`~/.openclaw/openclaw.json`）
+3. 已持有 SiliconFlow API Key
+4. OpenClaw 版本支持 `agents.defaults.memorySearch` 配置
 
-- `@lancedb/lancedb` 会根据你的系统架构自动安装对应原生依赖包
+---
 
-  - Linux x86_64 会自动安装 `@lancedb/lancedb-linux-x64-gnu`
-  - Linux ARM64 会自动安装 `@lancedb/lancedb-linux-arm64-gnu`
+## 二、推荐配置
 
-- 如果自动安装失败，需要手动安装对应架构包：
+将以下配置写入 OpenClaw 主配置文件中的：
 
-  ```bash
-  # Linux x86_64 示例
-  npm install @lancedb/lancedb-linux-x64-gnu --prefix /home/node/npm
-  ```
+- `agents.defaults.memorySearch`
 
-## 3. 验证依赖安装
-
-```bash
-# 验证模块安装位置
-ls -la /home/node/npm/node_modules/@lancedb/
-# 应该能看到 lancedb 和对应架构包
-
-# 验证原生包（Linux x86_64）
-ls -la /home/node/npm/node_modules/@lancedb/lancedb-linux-x64-gnu/
-```
-
-## 4. 配置 openclaw.json
-
-编辑 `/home/node/.openclaw/openclaw.json`，在 `plugins` 部分添加配置：
+推荐配置示例：
 
 ```json
 {
-  "plugins": {
-    "slots": {
-      "memory": "memory-lancedb"
-    },
-    "entries": {
-      "memory-lancedb": {
+  "agents": {
+    "defaults": {
+      "memorySearch": {
         "enabled": true,
-        "config": {
-          "embedding": {
-            "apiKey": "YOUR_API_KEY",
-            "model": "BAAI/bge-large-zh-v1.5",
-            "baseUrl": "https://api.siliconflow.cn/v1",
-            "dimensions": 1024
-          },
-          "autoCapture": true,
-          "autoRecall": true,
-          "captureMaxChars": 500
+        "provider": "openai",
+        "model": "Qwen/Qwen3-Embedding-8B",
+        "remote": {
+          "baseUrl": "https://api.siliconflow.cn/v1",
+          "apiKey": "YOUR_SILICONFLOW_API_KEY"
+        },
+        "sync": {
+          "watch": true
+        },
+        "query": {
+          "hybrid": {
+            "enabled": true,
+            "vectorWeight": 0.6,
+            "textWeight": 0.4,
+            "candidateMultiplier": 3
+          }
         }
       }
     }
@@ -79,633 +63,333 @@ ls -la /home/node/npm/node_modules/@lancedb/lancedb-linux-x64-gnu/
 }
 ```
 
-**配置说明：**
+---
 
-| 配置项        | 说明                                                         |
-| ------------- | ------------------------------------------------------------ |
-| `apiKey`      | 替换为你的 SiliconFlow API 密钥（或其他兼容 OpenAI 接口的 API Key） |
-| `model`       | 使用 BAAI/bge-large-zh-v1.5 中文开源嵌入模型                 |
-| `baseUrl`     | SiliconFlow 接口地址，可替换为其他 OpenAI 兼容地址           |
-| `dimensions`  | BAAI/bge-large-zh-v1.5 输出 1024 维向量                      |
-| `autoCapture` | 自动捕获会话记忆，建议开启                                   |
-| `autoRecall`  | 自动根据查询检索相关记忆，建议开启                           |
+## 三、配置项说明
 
-## 5. 验证安装
+### 1. `enabled: true`
 
-```bash
-# 检查 NODE_PATH 环境变量
-echo $NODE_PATH
-# 应包含 /home/node/npm/node_modules
+开启 memory search。
 
-# 如果没有添加，请编辑 ~/.profile 和 ~/.bashrc 添加：
-echo 'export NODE_PATH=/home/node/npm/node_modules:/home/node/bin:$NODE_PATH' >> ~/.profile
-echo 'export NODE_PATH=/home/node/npm/node_modules:/home/node/bin:$NODE_PATH' >> ~/.bashrc
-source ~/.profile
+### 2. `provider: "openai"`
 
-# 验证插件加载
-openclaw status
+因为 SiliconFlow 提供的是 OpenAI-compatible 接口，所以这里使用 `openai`。
+
+### 3. `model: "Qwen/Qwen3-Embedding-8B"`
+
+指定用于 embedding 的向量模型。
+
+### 4. `remote.baseUrl`
+
+填写 SiliconFlow 的 OpenAI-compatible API 地址：
+
+```text
+https://api.siliconflow.cn/v1
 ```
 
-**成功标志**，你应该看到类似输出：
+### 5. `remote.apiKey`
 
-```
-[plugins] memory-lancedb: plugin registered (db: /home/node/.openclaw/memory/lancedb, lazy init)
-...
-│ Memory          │ enabled (plugin memory-lancedb)                                                                    │
-```
+填写 SiliconFlow API Key。
 
-### 6. 进阶优化配置（推荐）
+> 更推荐后续改为环境变量或 SecretRef，不建议长期明文写入配置文件。
 
-基础安装完成后，推荐开启以下两个优化功能，提升搜索性能和准确率。
+### 6. `sync.watch: true`
 
-### 6.1 开启向量搜索缓存
+开启文件监听与索引增量更新。
+这会让 `MEMORY.md` 和 `memory/**/*.md` 更新后自动标记索引 dirty，并在后续搜索/同步时刷新。
 
-向量搜索缓存可以避免重复计算相同文本块的嵌入向量，节省 API 调用次数和网络延迟。
+### 7. `query.hybrid.enabled: true`
 
-在 memory-lancedb 的 config 中添加 cache 配置：
+开启混合搜索。
+混合搜索会将：
 
-```json
-  "plugins": {
-    "entries": {
-      "memory-lancedb": {
-        "enabled": true,
-        "config": {
-// ... 已有基础配置保持不变
-          "cache": {
-            "enabled": true,
-            "maxEntries": 50000
-          }
-        }
-      }
-    },
-```
+- 向量相似度（语义匹配）
+- BM25 全文关键词匹配（精确 token / 配置项 / 版本号）
 
-配置说明：
+组合在一起，比纯向量更适合 OpenClaw 这类技术文档/配置/版本问题场景。
 
-| 配置项     | 说明                                                 |
-| ---------- | ---------------------------------------------------- |
-| enabled    | 是否开启缓存，默认 false，需要显式开启               |
-| maxEntries | 最大缓存条目数，超过后自动淘汰旧条目，推荐设置 50000 |
+### 8. `vectorWeight` / `textWeight`
 
-效果： 记忆文件更新时，未更改的文本块会直接使用缓存的嵌入向量，无需重复调用 API，加快索引构建速度。
+推荐初始值：
 
-### 6.2 开启混合搜索（BM25 + 向量）
+- `vectorWeight: 0.6`
+- `textWeight: 0.4`
 
-混合搜索结合向量相似度和关键词匹配，大幅提升搜索准确率，特别是对于包含 ID、错误信息、代码符号等精确关键词的场景。
+含义：
 
-在 memory-lancedb 的 config 中添加 query.hybrid 配置：
+- 语义相关性略高于关键词匹配
+- 同时保留版本号、配置名、命令名等精确命中能力
 
-```json
-  "plugins": {
-    "entries": {
-      "memory-lancedb": {
-        "enabled": true,
-        "config": {
-// ... 已有基础配置保持不变
-          "query": {
-            "hybrid": {
-              "enabled": true,
-              "vectorWeight": 0.7,
-              "textWeight": 0.3,
-              "candidateMultiplier": 4
-            }
-          }
-        }
-      }
-    },
-```
+### 9. `candidateMultiplier: 3`
 
-配置说明：
+候选池倍率，先取一个稳妥值即可。
 
-| 配置项              | 说明                                       |
-| ------------------- | ------------------------------------------ |
-| enabled             | 是否开启混合搜索，默认 false，需要显式开启 |
-| vectorWeight        | 向量相似度权重，推荐 0.7（偏向语义搜索）   |
-| textWeight          | 关键词权重，推荐 0.3                       |
-| candidateMultiplier | 候选池倍数，默认 4，无需修改               |
+- 太小：召回不足
+- 太大：开销变高
 
-两种搜索方式优势互补：
+---
 
-· 向量搜索：擅长语义理解，同义词、不同措辞也能匹配
-· BM25 关键词搜索：擅长精确匹配 ID、错误信息、代码符号
+## 四、修改完成后需要做什么
 
-开启后自动生效，无需额外操作，搜索结果会更精准。
-
-### 6.3 完整配置示例
-
-开启缓存和混合搜索后的完整配置：
-
-```json
-  "plugins": {
-    "slots": {
-      "memory": "memory-lancedb"
-    },
-    "entries": {
-      "wecom-openclaw-plugin": {
-        "enabled": true
-      },
-      "memory-lancedb": {
-        "enabled": true,
-        "config": {
-          "embedding": {
-            "apiKey": "YOURAPIKEY",
-            "model": "BAAI/bge-large-zh-v1.5",
-            "baseUrl": "https://api.siliconflow.cn/v1",
-            "dimensions": 1024
-          },
-          "autoCapture": true,
-          "autoRecall": true,
-          "captureMaxChars": 500,
-          "cache": {
-            "enabled": true,
-            "maxEntries": 50000
-          },
-          "query": {
-            "hybrid": {
-              "enabled": true,
-              "vectorWeight": 0.7,
-              "textWeight": 0.3,
-              "candidateMultiplier": 4
-            }
-          }
-        }
-      }
-    },
-```
-
-6.4 重启生效
-
-配置修改后需要重启 OpenClaw Gateway 生效：
+修改配置后，需要让 OpenClaw 重新加载配置。
+常见方式：
 
 ```bash
 openclaw gateway restart
 ```
 
-## 7. 功能测试（必须执行）
-
-安装完成后需要进行实际功能测试，验证写入和搜索是否正常工作：
-
-### 7.1 创建测试脚本
+如果你不确定环境命令是否一致，也可以使用：
 
 ```bash
-cat > /home/node/.openclaw/workspace/tmp/test-memory.js << 'EOF'
-/**
- * Test script for memory-lancedb plugin functionality
- */
-
-import { randomUUID } from "node:crypto";
-import fs from "node:fs";
-import lancedb from "/home/node/.openclaw/npm/node_modules/@lancedb/lancedb/dist/index.js";
-import OpenAI from "/home/node/.openclaw/npm/node_modules/openai/index.mjs";
-
-const config = JSON.parse(fs.readFileSync("/home/node/.openclaw/openclaw.json", "utf8"));
-const memoryConfig = config.plugins.entries["memory-lancedb"].config;
-const dbPath = "/home/node/.openclaw/memory/lancedb";
-const TABLE_NAME = "memories";
-
-async function testLanceDBConnection() {
-  console.log("=== Testing LanceDB Connection ===\n");
-  const db = await lancedb.connect(dbPath);
-  console.log("✅ Connected to LanceDB successfully");
-  const tables = await db.tableNames();
-  console.log(`📋 Tables in database: ${JSON.stringify(tables)}`);
-  let table;
-  if (tables.includes(TABLE_NAME)) {
-    table = await db.openTable(TABLE_NAME);
-    console.log("✅ Opened existing table");
-  } else {
-    const schemaData = [{
-      id: "__init__",
-      text: "initialization record",
-      vector: Array.from({ length: memoryConfig.embedding.dimensions }).fill(0),
-      importance: 0,
-      category: "test",
-      createdAt: Date.now(),
-    }];
-    table = await db.createTable(TABLE_NAME, schemaData);
-    await table.delete('id = "__init__"');
-    console.log("✅ Created new table");
-  }
-  const count = await table.countRows();
-  console.log(`📊 Current row count: ${count}`);
-  return { db, table };
-}
-
-async function testEmbeddingGeneration(openai) {
-  console.log("\n=== Testing Embedding Generation ===\n");
-  const response = await openai.embeddings.create({
-    model: memoryConfig.embedding.model,
-    input: "这是一条测试记忆，用于测试 memory-lancedb 插件功能是否正常",
-    dimensions: memoryConfig.embedding.dimensions,
-  });
-  const embedding = response.data[0].embedding;
-  console.log(`✅ Generated embedding successfully`);
-  console.log(`📊 Embedding dimensions: ${embedding.length}`);
-  console.log(`📊 Expected dimensions: ${memoryConfig.embedding.dimensions}`);
-  if (embedding.length !== memoryConfig.embedding.dimensions) {
-    throw new Error(`Dimension mismatch: got ${embedding.length}, expected ${memoryConfig.embedding.dimensions}`);
-  }
-  return embedding;
-}
-
-async function testInsertMemory(table, embedding) {
-  console.log("\n=== Testing Memory Insertion ===\n");
-  const testEntry = {
-    id: randomUUID(),
-    text: "这是一条测试记忆，创建于 " + new Date().toISOString(),
-    vector: embedding,
-    importance: 5,
-    category: "test",
-    createdAt: Date.now(),
-  };
-  await table.add([testEntry]);
-  console.log(`✅ Inserted test memory successfully`);
-  console.log(`📝 Memory: ${testEntry.text}`);
-  console.log(`🔑 ID: ${testEntry.id}`);
-  const newCount = await table.countRows();
-  console.log(`📊 New row count: ${newCount}`);
-  return testEntry;
-}
-
-async function testVectorSearch(table, embedding) {
-  console.log("\n=== Testing Vector Search ===\n");
-  const results = await table.search(embedding).limit(5).toArray();
-  console.log(`✅ Vector search completed successfully`);
-  console.log(`🔍 Found ${results.length} results`);
-  results.forEach((result, index) => {
-    const score = result.score ?? result._distance ?? 0;
-    console.log(`\n${index + 1}. [score/distance: ${score ? score.toFixed(4) : 'N/A'}]`);
-    console.log(`   ID: ${result.id}`);
-    console.log(`   Text: ${result.text}`);
-    console.log(`   Category: ${result.category}`);
-    console.log(`   Importance: ${result.importance}`);
-  });
-  return results;
-}
-
-async function testMultipleMemories(table, openai) {
-  console.log("\n=== Testing Multiple Memories ===\n");
-  const testTexts = [
-    "HanMing 喜欢测试开源项目和阅读源代码",
-    "OpenClaw 是一个个人人工智能助手框架",
-    "memory-lancedb 使用 LanceDB 作为向量数据库",
-    "企业微信插件提供了通讯录、文档、待办等功能集成",
-  ];
-  for (const text of testTexts) {
-    const response = await openai.embeddings.create({
-      model: memoryConfig.embedding.model,
-      input: text,
-      dimensions: memoryConfig.embedding.dimensions,
-    });
-    const entry = {
-      id: randomUUID(),
-      text,
-      vector: response.data[0].embedding,
-      importance: 3,
-      category: "test",
-      createdAt: Date.now(),
-    };
-    await table.add([entry]);
-    console.log(`✅ Added: "${text}"`);
-  }
-  const finalCount = await table.countRows();
-  console.log(`\n📊 Final row count: ${finalCount}`);
-}
-
-async function testSemanticSearch(table, openai, query) {
-  console.log(`\n=== Testing Semantic Search: "${query}" ===\n`);
-  const response = await openai.embeddings.create({
-    model: memoryConfig.embedding.model,
-    input: query,
-    dimensions: memoryConfig.embedding.dimensions,
-  });
-  const queryEmbedding = response.data[0].embedding;
-  const results = await table.search(queryEmbedding).limit(3).toArray();
-  console.log(`✅ Semantic search completed`);
-  console.log(`🔍 Top ${results.length} results:\n`);
-  results.forEach((result, index) => {
-    const score = result.score ?? result._distance ?? 0;
-    console.log(`${index + 1}. [score/distance: ${score ? score.toFixed(4) : 'N/A'}] "${result.text}"`);
-  });
-  return results;
-}
-
-async function main() {
-  console.log("Starting memory-lancedb functionality test...\n");
-  const openai = new OpenAI({
-    apiKey: memoryConfig.embedding.apiKey,
-    baseURL: memoryConfig.embedding.baseUrl,
-  });
-  const { db, table } = await testLanceDBConnection();
-  const firstEmbedding = await testEmbeddingGeneration(openai);
-  await testInsertMemory(table, firstEmbedding);
-  await testMultipleMemories(table, openai);
-  await testVectorSearch(table, firstEmbedding);
-  await testSemanticSearch(table, openai, "框架功能测试");
-  await testSemanticSearch(table, openai, "阅读代码");
-  await testSemanticSearch(table, openai, "向量数据库存储");
-  console.log("\n🎉 All tests completed successfully!");
-  console.log("memory-lancedb plugin is working correctly.\n");
-  await db.close();
-}
-
-main().catch(err => {
-  console.error("\n❌ Test failed:", err);
-  process.exit(1);
-});
-EOF
+openclaw gateway status
 ```
 
-### 7.2 运行测试
-
-```bash
-cd /home/node/.openclaw/workspace/tmp/
-node test-memory.js
-```
-
-### 7.3 预期输出
-
-所有步骤都显示 `✅`，最终输出：
-
-```
-🎉 All tests completed successfully!
-memory-lancedb plugin is working correctly.
-```
-
-如果看到这个，表示**安装成功，功能完全正常**。
-
-### 7.4 成功清理
-
-测试成功后清理掉测试文件
-
-```bash
-rm /home/node/.openclaw/workspace/tmp/test-memory.js
-```
-
-## 8. 常见问题解决
-
-### 问题 1: `Cannot find package '@lancedb/lancedb'`
-
-**原因**: NODE_PATH 环境变量没有正确配置
-
-**解决**:
-
-```bash
-# 添加到环境变量
-echo 'export NODE_PATH=/home/node/.openclaw/npm/node_modules:/home/node/bin:$NODE_PATH' >> ~/.profile
-echo 'export NODE_PATH=/home/node/.openclaw/npm/node_modules:/home/node/bin:$NODE_PATH' >> ~/.bashrc
-source ~/.profile
-```
-
-### 问题 2: 原生依赖包缺失
-
-**原因**: 自动安装未安装对应架构的可选依赖
-
-**解决** (Linux x86_64 示例):
-
-```bash
-cd /home/node/.openclaw/npm
-npm install @lancedb/lancedb-linux-x64-gnu --prefix /home/node/.openclaw/npm
-```
-
-### 问题 3: 容器环境提示 `Cannot find module 'openai'`
-
-**原因**: 在容器化部署中，网关进程启动时没有加载用户 `~/.profile` 中的 `NODE_PATH` 环境变量，虽然配置了仍然找不到模块。
-
-**解决**:  
-创建符号链接，让 Node.js 可以直接找到：
-
-```bash
-mkdir -p /home/node/.openclaw/npm/node_modules
-ln -sf /home/node/.openclaw/npm/node_modules/openai /app/node_modules/openai
-ln -sf /home/node/.openclaw/npm/node_modules/@lancedb /app/node_modules/@lancedb
-```
-
-验证链接：
-
-```bash
-ls -la /app/node_modules/ | grep -E "(openai|@lancedb)"
-```
-
-应该看到：
-
-```
-lrwxrwxrwx   1 node node    36 Mar 21 17:01 @lancedb -> /home/node/.openclaw/npm/node_modules/@lancedb
-lrwxrwxrwx   1 node node    34 Mar 21 17:01 openai -> /home/node/.openclaw/npm/node_modules/openai
-```
-
-### 问题 4: 提示 `memory config has unknown keys: cache, query` 或 `must NOT have additional properties`
-
-**原因**: 当前官方版本代码中，JSON Schema 和代码校验白名单都没有包含 `cache` 和 `query` 这两个新配置项，需要手动修改源码添加支持。
-
-**解决**: 需要修改两个文件：
-
-**1. 修改 `/app/extensions/memory-lancedb/openclaw.plugin.json`**
-
-在 `configSchema.properties` 中添加：
-
-```json
-{
-  "configSchema": {
-    "type": "object",
-    "additionalProperties": false,
-    "properties": {
-      // ... 已有配置保持不变 ...
-      "cache": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "enabled": { "type": "boolean" },
-          "maxEntries": { "type": "number", "minimum": 1000, "maximum": 200000 }
-        }
-      },
-      "query": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "hybrid": {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-              "enabled": { "type": "boolean" },
-              "vectorWeight": { "type": "number" },
-              "textWeight": { "type": "number" },
-              "candidateMultiplier": { "type": "number" }
-            }
-          }
-        }
-      }
-    }
-  }
-}
-```
-
-在 `uiHints` 中添加：
-
-```json
-    "cache.enabled": {
-      "label": "Enable Embedding Cache",
-      "help": "Cache embedding results to avoid duplicate API calls",
-      "advanced": true
-    },
-    "cache.maxEntries": {
-      "label": "Cache Max Entries",
-      "help": "Maximum number of cached embeddings",
-      "advanced": true,
-      "placeholder": "50000"
-    },
-    "query.hybrid.enabled": {
-      "label": "Enable Hybrid Search",
-      "help": "Combine vector search with BM25 keyword search for better accuracy",
-      "advanced": true
-    }
-```
-
-**2. 修改 `/app/extensions/memory-lancedb/config.ts`**
-
-更新类型定义：
-
-```typescript
-export type MemoryConfig = {
-  // ... 已有保持不变 ...
-  cache?: {
-    enabled: boolean;
-    maxEntries: number;
-  };
-  query?: {
-    hybrid?: {
-      enabled: boolean;
-      vectorWeight: number;
-      textWeight: number;
-      candidateMultiplier: number;
-    };
-  };
-};
-```
-
-更新 `assertAllowedKeys` 白名单：
-
-```typescript
-assertAllowedKeys(
-  cfg,
-  ["embedding", "dbPath", "autoCapture", "autoRecall", "captureMaxChars", "cache", "query"],
-  "memory config",
-);
-```
-
-在 `return` 前添加解析逻辑：
-
-```typescript
-let cache: MemoryConfig["cache"];
-if (cfg.cache && typeof cfg.cache === "object") {
-  const c = cfg.cache as Record<string, unknown>;
-  cache = {
-    enabled: Boolean(c.enabled),
-    maxEntries: typeof c.maxEntries === "number" ? c.maxEntries : 50000,
-  };
-}
-
-let query: MemoryConfig["query"];
-if (cfg.query && typeof cfg.query === "object") {
-  const q = cfg.query as Record<string, unknown>;
-  if (q.hybrid && typeof q.hybrid === "object") {
-    const h = q.hybrid as Record<string, unknown>;
-    query = {
-      hybrid: {
-        enabled: Boolean(h.enabled),
-        vectorWeight: typeof h.vectorWeight === "number" ? h.vectorWeight : 0.7,
-        textWeight: typeof h.textWeight === "number" ? h.textWeight : 0.3,
-        candidateMultiplier: typeof h.candidateMultiplier === "number" ? h.candidateMultiplier : 4,
-      },
-    };
-  }
-}
-```
-
-更新返回对象：
-
-```typescript
-return {
-  // ... 已有保持不变 ...
-  cache,
-  query,
-};
-```
-
-修改完成后重新检查状态：
-
-```bash
-openclaw status
-```
-
-看到 `memory-lancedb: plugin registered` 表示成功。
-
-### 问题 5: 搜索结果显示正常但 score 字段不存在
-
-这是因为 LanceDB v0.26+ 版本中，相似度分数字段已从 `score` 改名为 `_distance`。插件代码已经适配处理这个变化，不影响使用。
-
-### 问题 6: 维度不匹配
-
-**原因**: embedding 模型输出维度与配置不一致
-
-**解决**: 检查配置中的 `dimensions` 是否与使用的模型匹配：
-
-- BAAI/bge-large-zh-v1.5 → 1024
-- BAAI/bge-small-zh-v1.5 → 512
-
-## 最终目录结构
-
-```
-/home/node/
-├── .profile                       # NODE_PATH 已配置 ✓
-├── .bashrc                        # NODE_PATH 已配置 ✓
-├── bin # 二进制文件
-├── tmp/ # 所有临时文件
-├── npm/                 # 👈 所有 npm 相关文件都在这里
-│   ├── node_modules/
-│   │   ├── @lancedb/
-│   │   │   ├── lancedb/           # LanceDB 主包 ✓
-│   │   │   └── lancedb-linux-x64-gnu/  # 原生依赖 ✓
-│   │   └── openai/                # OpenAI SDK ✓
-│   └── package.json
-└── .openclaw/
-    ├── .profile # 环境变量（含 NODE_PATH）
-    ├── openclaw.json              # 已配置 memory-lancedb ✓
-    ├── extensions/ # 👉 用户安装的第三方插件
-    ├── data/ # 👉 通用运行时数据
-    └── memory/
-        └── lancedb/               # 向量数据库存储目录 ✓
-```
-
-## 路径标准遵循
-
-| 项目      | 位置                                     | 遵循标准           |
-| --------- | ---------------------------------------- | ------------------ |
-| 插件代码  | `/app/extensions/memory-lancedb/`        | ✅ 只读内置，不修改 |
-| 依赖包    | `/home/node/.openclaw/npm/node_modules/` | ✅ 遵循统一标准     |
-| NODE_PATH | 在 `~/.profile` 配置                     | ✅ 已配置           |
-| 数据存储  | `/home/node/.openclaw/memory/lancedb/`   | ✅ 遵循标准         |
-
-## 验证命令
-
-```bash
-# 检查插件状态
-openclaw status | grep "memory"
-
-# 检查数据库大小
-du -sh /home/node/.openclaw/memory/lancedb/
-
-# 检查依赖安装
-ls -la /home/node/.openclaw/npm/node_modules/@lancedb/
-```
-
-## 安装完成
-
-✅ 安装完成，memory-lancedb 插件功能正常，可以使用向量记忆功能了。
+确认当前网关状态。
 
 ---
 
-**更新记录**:
+## 五、功能测试方法
 
-- 2026-03-20: 更新，添加了功能测试步骤和常见问题解决，适配 LanceDB v0.27.0
-- 2026-03-21: 补充容器环境问题解决，添加缓存/混合搜索源码修改步骤
+建议按以下顺序测试。
+
+### 测试 1：基础配置是否生效
+
+目标：确认 OpenClaw 没有因为 memory 配置报错。
+
+检查点：
+
+- gateway 可正常启动
+- 没有因 `memorySearch` 配置报 schema / provider / model 错误
+- 没有因 API 认证失败导致启动异常
+
+如果有日志系统，重点看：
+
+- memory search 初始化日志
+- embedding provider 初始化日志
+- hybrid / FTS 初始化日志
+
+---
+
+### 测试 2：向量检索是否生效
+
+目标：确认 embedding 真的在工作。
+
+#### 准备测试内容
+
+在 workspace 中准备：
+
+`MEMORY.md`
+
+```md
+HanMing 更关注 OpenClaw 版本更新的迁移影响和稳定性。
+```
+
+然后发起语义相关但不完全同词的查询，例如：
+
+- “升级代价大不大？”
+- “这次更新对现有部署影响如何？”
+- “我更关心 release 的什么部分？”
+
+#### 预期结果
+
+如果向量检索生效，应能召回上面这条记忆，即使查询没有直接出现“迁移影响”和“稳定性”原词。
+
+---
+
+### 测试 3：关键词/BM25 是否参与混合搜索
+
+目标：确认 hybrid 不是纯向量。
+
+#### 准备测试内容
+
+在 memory 文件中写入包含精确关键词的信息，例如：
+
+```md
+OpenClaw v2026.3.22 移除了 browser.relayBindHost，并废弃 legacy Chrome extension relay。
+```
+
+然后搜索：
+
+- `browser.relayBindHost`
+- `v2026.3.22`
+- `legacy Chrome extension relay`
+
+#### 预期结果
+
+如果 hybrid 生效，这类精确 token、版本号、配置项应该能被稳定命中。
+
+---
+
+### 测试 4：缓存 / 文件监听 / 增量更新是否生效
+
+目标：确认 watch + cache 正常工作。
+
+#### 步骤
+
+1. 先写入一条旧内容
+2. 触发一次 memory 搜索
+3. 修改该条内容或新增一条新内容
+4. 再次触发 memory 搜索
+
+#### 预期结果
+
+- 新内容能在后续搜索中出现
+- 不需要手动清空整个索引
+- 不需要每次全量重建
+
+> 官方文档说明：memory 文件变化会被 watcher 标记为 dirty，并以 debounce 方式同步。
+
+---
+
+## 六、推荐测试样例
+
+### 样例 A：语义测试
+
+记忆：
+
+```md
+HanMing 更关心 breaking changes、迁移成本和稳定性，而不是只看 changelog。
+```
+
+查询：
+
+- “我看版本更新时最在意什么？”
+- “我更想知道哪些更新信息？”
+
+预期：
+
+- 能召回这条记忆
+
+### 样例 B：精确关键词测试
+
+记忆：
+
+```md
+OpenClaw memory 配置路径是 agents.defaults.memorySearch。
+```
+
+查询：
+
+- `agents.defaults.memorySearch`
+
+预期：
+
+- 精确命中
+
+### 样例 C：更新后增量测试
+
+旧记忆：
+
+```md
+HanMing 偏好简短总结。
+```
+
+改成：
+
+```md
+HanMing 偏好结构化、信息密度高的总结。
+```
+
+查询：
+
+- “HanMing 喜欢什么样的回答风格？”
+
+预期：
+
+- 新内容应优先生效
+
+---
+
+## 七、常见问题与排查
+
+### 1. 配置写了但没有结果
+
+优先检查：
+
+- `memorySearch.enabled` 是否为 `true`
+- `provider` 是否为 `openai`
+- `model` 是否写对
+- `baseUrl` 是否可达
+- `apiKey` 是否有效
+
+### 2. 语义问题查不到，只有精确词能查到
+
+可能原因：
+
+- embedding 接口没有真正生效
+- API key 无效
+- 模型名不可用
+- baseUrl 不正确
+
+### 3. 精确 token 查不到
+
+可能原因：
+
+- hybrid 未开启
+- 平台上全文检索不可用，退回到了纯向量模式
+- 记忆内容没有落到被索引的 Markdown 文件里
+
+### 4. 修改 memory 后搜索结果不更新
+
+可能原因：
+
+- gateway 还没重载新配置
+- watcher 尚未完成 debounce 后同步
+- 当前搜索命中了旧索引缓存
+
+处理建议：
+
+- 重启 gateway
+- 稍等数秒后再次搜索
+- 确认修改的是 `MEMORY.md` 或 `memory/**/*.md`
+
+---
+
+## 八、生产环境建议
+
+### 建议 1：不要把 API Key 长期明文写进配置
+
+更推荐：
+
+- 环境变量
+- SecretRef
+- 受控密钥管理方式
+
+### 建议 2：先用内置 hybrid，不要一上来就上 QMD
+
+OpenClaw 内置的 memorySearch 已支持：
+
+- 向量搜索
+- 混合搜索
+- watcher / debounce / 缓存索引
+
+这已经足够覆盖多数场景。
+QMD 更强，但复杂度更高，适合后续再增强。
+
+### 建议 3：记忆内容要写得结构化
+
+即使检索能力开得再强，记忆内容本身如果全是噪音，效果也不会好。
+建议搭配：
+
+- `MEMORY.md`：长期记忆
+- `memory/YYYY-MM-DD.md`：日常记录
+
+---
+
+## 九、推荐结论
+
+对于 OpenClaw 的技术型使用场景，推荐默认开启：
+
+- 向量检索：**开**
+- 缓存 / 文件监听更新：**开**
+- 混合搜索：**开**
+
+推荐初始组合：
+
+- provider: `openai`
+- model: `Qwen/Qwen3-Embedding-8B`
+- baseUrl: `https://api.siliconflow.cn/v1`
+- hybrid: enabled
+- watch: enabled
+
+这套组合在“语义理解 + 精确关键词命中 + 日常增量更新”之间比较平衡，适合大多数 OpenClaw 记忆使用场景。
