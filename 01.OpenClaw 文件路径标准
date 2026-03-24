@@ -146,17 +146,6 @@ npm install <package-name> --prefix /home/node/.openclaw/npm
 
 ---
 
-### 3.7 记忆与向量数据目录
-
-记忆与向量数据库统一放在：
-
-```bash
-/home/node/.openclaw/memory
-/home/node/.openclaw/memory/lancedb
-```
-
----
-
 ## 4. 内置目录处理原则
 
 OpenClaw 内置扩展目录通常为：
@@ -198,8 +187,6 @@ OpenClaw 内置扩展目录通常为：
     ├── extensions/
     │   └── <plugin-id>/
     ├── data/
-    ├── memory/
-    │   └── lancedb/
     └── workspace/
         ├── AGENTS.md
         ├── tmp/
@@ -217,7 +204,6 @@ mkdir -p /home/node/.openclaw/bin
 mkdir -p /home/node/.openclaw/extensions
 mkdir -p /home/node/.openclaw/npm/node_modules
 mkdir -p /home/node/.openclaw/data
-mkdir -p /home/node/.openclaw/memory/lancedb
 mkdir -p /home/node/.openclaw/workspace/tmp
 mkdir -p /home/node/.openclaw/workspace/data
 ```
