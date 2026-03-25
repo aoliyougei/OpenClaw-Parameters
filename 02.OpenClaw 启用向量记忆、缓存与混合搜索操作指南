@@ -1,38 +1,75 @@
-# OpenClaw 启用向量记忆、缓存与混合搜索操作指南（SiliconFlow / Qwen3-Embedding-8B）
+# OpenClaw 安装与记忆检索配置操作文档
 
-## 目标
+本文档只关注 **OpenClaw 安装后的记忆检索配置与验证**，不再展开标准路径规则安装内容。
 
-本文档用于在 OpenClaw 中启用以下能力：
+适用目标：
 
-- 向量记忆检索（Vector Search）
-- 索引缓存 / 文件监听增量更新（Watch + Cache）
-- 混合搜索（BM25 + Vector Hybrid Search）
-
-本文采用：
-
-- 向量模型：`Qwen/Qwen3-Embedding-8B`
-- OpenAI-compatible API Base URL：`https://api.siliconflow.cn/v1`
-
-> 说明：OpenClaw 官方 memory 配置支持使用 `provider: "openai"` 对接自定义 OpenAI-compatible embeddings endpoint。
+- 在一个已经完成基础安装的 OpenClaw 环境中
+- 启用向量记忆检索、缓存、文件监听、混合搜索
+- 创建并准备记忆文件
+- 完成首轮 memory 索引构建
+- 验证语义召回、关键词命中、缓存与混合搜索是否生效
+- 在出现索引异常时完成修复
 
 ---
 
 ## 一、前置条件
 
-1. OpenClaw 已正常运行
-2. 可访问 OpenClaw 主配置文件（常见路径：`~/.openclaw/openclaw.json`）
-3. 已持有 SiliconFlow API Key
-4. OpenClaw 版本支持 `agents.defaults.memorySearch` 配置
+开始前默认以下条件已经满足：
+
+1. OpenClaw 已安装并可运行
+2. 主配置文件存在：
+
+```text
+/home/node/.openclaw/openclaw.json
+```
+
+3. workspace 已存在：
+
+```text
+/home/node/.openclaw/workspace
+```
+
+4. 已具备可用的 embedding API Key
+
+如果你还没有完成标准路径初始化，请先参考“标准路径规则安装配置文档”，不要把路径初始化步骤混在本文件中执行。
 
 ---
 
-## 二、推荐配置
+## 二、记忆检索配置目标
 
-将以下配置写入 OpenClaw 主配置文件中的：
+本次配置目标为：
 
-- `agents.defaults.memorySearch`
+- 启用向量记忆检索
+- 启用 embedding 缓存
+- 启用文件监听增量更新
+- 启用混合搜索（vector + FTS）
+- 使用 OpenAI-compatible 远程 embedding 接口
 
-推荐配置示例：
+推荐组合：
+
+- provider: `openai`
+- model: `Qwen/Qwen3-Embedding-8B`
+- remote.baseUrl: `https://api.siliconflow.cn/v1`
+- remote.apiKey: `${EMBEDDING_API_KEY}`
+
+---
+
+## 三、配置写入位置
+
+记忆检索配置必须写在：
+
+```json
+agents.defaults.memorySearch
+```
+
+不要错误写到顶层 `memorySearch`。
+
+---
+
+## 四、推荐配置内容
+
+在 `/home/node/.openclaw/openclaw.json` 中确保存在以下结构：
 
 ```json
 {
@@ -49,6 +86,9 @@
         "sync": {
           "watch": true
         },
+        "cache": {
+          "enabled": true
+        },
         "query": {
           "hybrid": {
             "enabled": true,
@@ -63,331 +103,371 @@
 }
 ```
 
+字段说明：
+
+- `enabled = true`：启用 memorySearch
+- `provider = "openai"`：用于 OpenAI-compatible 接口
+- `model = "Qwen/Qwen3-Embedding-8B"`：指定 embedding 模型
+- `remote.baseUrl`：远程 embedding 服务地址
+- `remote.apiKey`：通过环境变量引用 API Key
+- `sync.watch = true`：启用 watcher
+- `cache.enabled = true`：启用缓存
+- `hybrid.enabled = true`：启用混合搜索
+
 ---
 
-## 三、配置项说明
+## 五、环境变量要求
 
-### 1. `enabled: true`
+确保 OpenClaw 运行环境中可用：
 
-开启 memory search。
-
-### 2. `provider: "openai"`
-
-因为 SiliconFlow 提供的是 OpenAI-compatible 接口，所以这里使用 `openai`。
-
-### 3. `model: "Qwen/Qwen3-Embedding-8B"`
-
-指定用于 embedding 的向量模型。
-
-### 4. `remote.baseUrl`
-
-填写 SiliconFlow 的 OpenAI-compatible API 地址：
-
-```text
-https://api.siliconflow.cn/v1
+```bash
+export EMBEDDING_API_KEY=你的_embedding_api_key
 ```
 
-### 5. `remote.apiKey`
-
-已配置环境变量：EMBEDDING_API_KEY。
-
-### 6. `sync.watch: true`
-
-开启文件监听与索引增量更新。
-这会让 `MEMORY.md` 和 `memory/**/*.md` 更新后自动标记索引 dirty，并在后续搜索/同步时刷新。
-
-### 7. `query.hybrid.enabled: true`
-
-开启混合搜索。
-混合搜索会将：
-
-- 向量相似度（语义匹配）
-- BM25 全文关键词匹配（精确 token / 配置项 / 版本号）
-
-组合在一起，比纯向量更适合 OpenClaw 这类技术文档/配置/版本问题场景。
-
-### 8. `vectorWeight` / `textWeight`
-
-推荐初始值：
-
-- `vectorWeight: 0.6`
-- `textWeight: 0.4`
-
-含义：
-
-- 语义相关性略高于关键词匹配
-- 同时保留版本号、配置名、命令名等精确命中能力
-
-### 9. `candidateMultiplier: 3`
-
-候选池倍率，先取一个稳妥值即可。
-
-- 太小：召回不足
-- 太大：开销变高
+如果是通过容器、supervisor 或其他进程管理方式运行 OpenClaw，请确保该变量对实际运行 gateway 的进程可见。
 
 ---
 
-## 四、修改完成后需要做什么
+## 六、准备记忆文件
 
-修改配置后，需要让 OpenClaw 重新加载配置。
-常见方式：
+### 1. 创建长期记忆文件
+
+如果不存在：
+
+```bash
+touch /home/node/.openclaw/workspace/MEMORY.md
+```
+
+### 2. 创建 daily memory 目录
+
+```bash
+mkdir -p /home/node/.openclaw/workspace/memory
+```
+
+说明：
+
+- 这一步必须做
+- 即使暂时没有 daily notes，也建议先建目录
+- 否则后续扫描可能提示 `memory directory missing`
+
+### 3. 写入最小测试内容
+
+```bash
+cat > /home/node/.openclaw/workspace/MEMORY.md <<'EOF'
+HanMing 更关心 breaking changes、迁移成本和稳定性，而不是只看 changelog。
+
+OpenClaw memory 配置路径是 agents.defaults.memorySearch。
+
+OpenClaw v2026.3.22 移除了 browser.relayBindHost，并废弃 legacy Chrome extension relay。
+EOF
+```
+
+---
+
+## 七、配置生效方式
+
+修改完配置后，需要让运行中的 OpenClaw 读取新配置。
+
+### 方式 A：如果环境支持标准 gateway 管理
 
 ```bash
 openclaw gateway restart
 ```
 
-如果你不确定环境命令是否一致，也可以使用：
+### 方式 B：如果在容器环境中运行且不支持 systemd/user service
+
+需要重启真正运行 OpenClaw 的进程或容器，而不是单纯依赖：
 
 ```bash
-openclaw gateway status
+openclaw gateway restart
 ```
 
-确认当前网关状态。
+例如：
+
+- 重启容器
+- 重启 supervisor 管理的 OpenClaw 进程
+- 重启 entrypoint 启动的前台 gateway 进程
 
 ---
 
-## 五、功能测试方法
+## 八、配置后的状态检查
 
-建议按以下顺序测试。
+### 1. 总体状态
 
-### 测试 1：基础配置是否生效
-
-目标：确认 OpenClaw 没有因为 memory 配置报错。
-
-检查点：
-
-- gateway 可正常启动
-- 没有因 `memorySearch` 配置报 schema / provider / model 错误
-- 没有因 API 认证失败导致启动异常
-
-如果有日志系统，重点看：
-
-- memory search 初始化日志
-- embedding provider 初始化日志
-- hybrid / FTS 初始化日志
-
----
-
-### 测试 2：向量检索是否生效
-
-目标：确认 embedding 真的在工作。
-
-#### 准备测试内容
-
-在 workspace 中准备：
-
-`MEMORY.md`
-
-```md
-HanMing 更关注 OpenClaw 版本更新的迁移影响和稳定性。
+```bash
+openclaw status
 ```
 
-然后发起语义相关但不完全同词的查询，例如：
+理想状态应包含：
 
-- “升级代价大不大？”
-- “这次更新对现有部署影响如何？”
-- “我更关心 release 的什么部分？”
+- `vector ready`
+- `fts ready`
+- `cache on`
 
-#### 预期结果
+### 2. 官方 memory 深度状态
 
-如果向量检索生效，应能召回上面这条记忆，即使查询没有直接出现“迁移影响”和“稳定性”原词。
-
----
-
-### 测试 3：关键词/BM25 是否参与混合搜索
-
-目标：确认 hybrid 不是纯向量。
-
-#### 准备测试内容
-
-在 memory 文件中写入包含精确关键词的信息，例如：
-
-```md
-OpenClaw v2026.3.22 移除了 browser.relayBindHost，并废弃 legacy Chrome extension relay。
+```bash
+openclaw memory status --agent main --deep --json
 ```
 
-然后搜索：
+重点检查字段：
 
-- `browser.relayBindHost`
-- `v2026.3.22`
-- `legacy Chrome extension relay`
+- `files`
+- `chunks`
+- `dirty`
+- `provider`
+- `model`
+- `cache.enabled`
+- `cache.entries`
+- `fts.available`
+- `vector.available`
+- `embeddingProbe.ok`
 
-#### 预期结果
+理想状态示例：
 
-如果 hybrid 生效，这类精确 token、版本号、配置项应该能被稳定命中。
-
----
-
-### 测试 4：缓存 / 文件监听 / 增量更新是否生效
-
-目标：确认 watch + cache 正常工作。
-
-#### 步骤
-
-1. 先写入一条旧内容
-2. 触发一次 memory 搜索
-3. 修改该条内容或新增一条新内容
-4. 再次触发 memory 搜索
-
-#### 预期结果
-
-- 新内容能在后续搜索中出现
-- 不需要手动清空整个索引
-- 不需要每次全量重建
-
-> 官方文档说明：memory 文件变化会被 watcher 标记为 dirty，并以 debounce 方式同步。
+- `provider = openai`
+- `model = Qwen/Qwen3-Embedding-8B`
+- `embeddingProbe.ok = true`
+- `fts.available = true`
+- `vector.available = true`
+- `files >= 1`
+- `chunks >= 1`
 
 ---
 
-## 六、推荐测试样例
+## 九、如果索引未完成：官方强制重建
 
-### 样例 A：语义测试
+如果出现以下现象：
 
-记忆：
+- `memory_search` 返回 `database is not open`
+- `openclaw status` 长时间显示 `0 files / 0 chunks / dirty`
+- 配置已生效但查不到任何内容
 
-```md
+优先执行官方重建：
+
+```bash
+openclaw memory index --agent main --force --verbose
+```
+
+然后再次检查：
+
+```bash
+openclaw memory status --agent main --deep --json
+```
+
+本次实际验证表明，这一步是修复“配置已生效但索引未稳定完成首轮构建”的关键动作。
+
+---
+
+## 十、检索验证步骤
+
+### 1. 语义召回验证
+
+```bash
+openclaw memory search "我看版本更新时最在意什么？"
+```
+
+期望命中：
+
+- `HanMing 更关心 breaking changes、迁移成本和稳定性...`
+
+### 2. 精确关键词验证
+
+```bash
+openclaw memory search "agents.defaults.memorySearch"
+openclaw memory search "browser.relayBindHost"
+```
+
+期望命中对应 `MEMORY.md` 内容。
+
+### 3. 混合搜索验证
+
+若结果中可见：
+
+- `provider = openai`
+- `mode = hybrid`
+
+则可认定混合搜索已生效。
+
+### 4. 缓存验证
+
+执行：
+
+```bash
+openclaw memory status --agent main --deep --json
+```
+
+确认：
+
+- `cache.enabled = true`
+- `cache.entries >= 1`
+
+### 5. 文件监听验证
+
+向 `MEMORY.md` 或 `workspace/memory/*.md` 追加内容后再次检索。
+
+例如：
+
+```bash
+echo '' >> /home/node/.openclaw/workspace/MEMORY.md
+echo 'HanMing 安装 OpenClaw 时优先关注稳定性和迁移成本。' >> /home/node/.openclaw/workspace/MEMORY.md
+```
+
+然后执行：
+
+```bash
+openclaw memory search "安装 OpenClaw 时优先关注什么？"
+```
+
+如果未及时命中，可再次执行：
+
+```bash
+openclaw memory index --agent main --force --verbose
+```
+
+---
+
+## 十一、本次故障复盘
+
+### 1. 初始现象
+
+曾出现：
+
+- `memory_search` 返回 `provider: none`
+- 仅 `fts-only`
+- 查询无结果
+- `database is not open`
+- `openclaw status` 显示 `0 files / 0 chunks / dirty`
+
+### 2. 根因
+
+根因不是 API Key 缺失，也不是 provider 配置错误，而是：
+
+- memorySearch 配置启用后，索引没有稳定完成首轮同步
+- 数据库文件虽已创建，但 file/chunk 状态没有正确收敛
+- 查询在索引未完全准备好时触发，导致出现 `database is not open`
+
+### 3. 有效修复措施
+
+按以下顺序修复成功：
+
+1. 正确写入 `agents.defaults.memorySearch`
+2. 确认 provider/model/baseUrl/apiKey/watch/cache/hybrid 配置齐全
+3. 重启或重载 gateway
+4. 创建 `workspace/memory/` 目录
+5. 使用官方命令强制重建索引：
+
+```bash
+openclaw memory index --agent main --force --verbose
+```
+
+### 4. 结论
+
+如果配置已正确，但 memory 检索仍异常，优先怀疑：
+
+- 首轮索引未完成
+- 数据库状态不稳定
+- 需要官方 reindex 收口
+
+不要第一时间误判为：
+
+- API Key 错
+- provider 不可用
+- 文件不存在
+- 路径错误
+
+应优先执行：
+
+```bash
+openclaw memory status --agent main --deep --json
+openclaw memory index --agent main --force --verbose
+```
+
+---
+
+## 十二、推荐收尾动作
+
+### 1. 修复配置文件权限
+
+```bash
+chmod 600 /home/node/.openclaw/openclaw.json
+```
+
+### 2. 再次检查状态
+
+```bash
+openclaw status
+openclaw memory status --agent main --deep --json
+```
+
+### 3. 再做一次语义检索
+
+```bash
+openclaw memory search "我看版本更新时最在意什么？"
+```
+
+---
+
+## 十三、最小可执行流程
+
+在已经完成基础安装的 OpenClaw 环境中，推荐直接按以下顺序操作：
+
+```bash
+mkdir -p /home/node/.openclaw/workspace/memory
+
+touch /home/node/.openclaw/workspace/MEMORY.md
+
+cat > /home/node/.openclaw/workspace/MEMORY.md <<'EOF'
 HanMing 更关心 breaking changes、迁移成本和稳定性，而不是只看 changelog。
-```
 
-查询：
-
-- “我看版本更新时最在意什么？”
-- “我更想知道哪些更新信息？”
-
-预期：
-
-- 能召回这条记忆
-
-### 样例 B：精确关键词测试
-
-记忆：
-
-```md
 OpenClaw memory 配置路径是 agents.defaults.memorySearch。
+
+OpenClaw v2026.3.22 移除了 browser.relayBindHost，并废弃 legacy Chrome extension relay。
+EOF
 ```
 
-查询：
+然后确保 `openclaw.json` 中存在：
 
-- `agents.defaults.memorySearch`
+- `agents.defaults.memorySearch.enabled = true`
+- `provider = openai`
+- `model = Qwen/Qwen3-Embedding-8B`
+- `remote.baseUrl = https://api.siliconflow.cn/v1`
+- `remote.apiKey = ${EMBEDDING_API_KEY}`
+- `sync.watch = true`
+- `cache.enabled = true`
+- `query.hybrid.enabled = true`
 
-预期：
+然后执行：
 
-- 精确命中
-
-### 样例 C：更新后增量测试
-
-旧记忆：
-
-```md
-HanMing 偏好简短总结。
+```bash
+openclaw memory status --agent main --deep --json
+openclaw memory index --agent main --force --verbose
+openclaw memory search "我看版本更新时最在意什么？"
+openclaw memory search "agents.defaults.memorySearch"
+openclaw memory search "browser.relayBindHost"
+chmod 600 /home/node/.openclaw/openclaw.json
 ```
-
-改成：
-
-```md
-HanMing 偏好结构化、信息密度高的总结。
-```
-
-查询：
-
-- “HanMing 喜欢什么样的回答风格？”
-
-预期：
-
-- 新内容应优先生效
 
 ---
 
-## 七、常见问题与排查
+## 十四、完成判定标准
 
-### 1. 配置写了但没有结果
+满足以下条件即可判定记忆检索配置完成：
 
-优先检查：
+1. `openclaw memory status --agent main --deep --json` 中：
+   - `provider = openai`
+   - `embeddingProbe.ok = true`
+   - `fts.available = true`
+   - `vector.available = true`
+   - `files >= 1`
+   - `chunks >= 1`
 
-- `memorySearch.enabled` 是否为 `true`
-- `provider` 是否为 `openai`
-- `model` 是否写对
-- `baseUrl` 是否可达
-- `apiKey` 是否有效
+2. `openclaw memory search` 能搜到 `MEMORY.md` 中的内容
 
-### 2. 语义问题查不到，只有精确词能查到
+3. `workspace/memory/` 目录已存在
 
-可能原因：
-
-- embedding 接口没有真正生效
-- API key 无效
-- 模型名不可用
-- baseUrl 不正确
-
-### 3. 精确 token 查不到
-
-可能原因：
-
-- hybrid 未开启
-- 平台上全文检索不可用，退回到了纯向量模式
-- 记忆内容没有落到被索引的 Markdown 文件里
-
-### 4. 修改 memory 后搜索结果不更新
-
-可能原因：
-
-- gateway 还没重载新配置
-- watcher 尚未完成 debounce 后同步
-- 当前搜索命中了旧索引缓存
-
-处理建议：
-
-- 重启 gateway
-- 稍等数秒后再次搜索
-- 确认修改的是 `MEMORY.md` 或 `memory/**/*.md`
+4. `openclaw.json` 权限已收紧为 `600`
 
 ---
 
-## 八、生产环境建议
-
-### 建议 1：不要把 API Key 长期明文写进配置
-
-更推荐：
-
-- 环境变量
-- SecretRef
-- 受控密钥管理方式
-
-### 建议 2：先用内置 hybrid，不要一上来就上 QMD
-
-OpenClaw 内置的 memorySearch 已支持：
-
-- 向量搜索
-- 混合搜索
-- watcher / debounce / 缓存索引
-
-这已经足够覆盖多数场景。
-QMD 更强，但复杂度更高，适合后续再增强。
-
-### 建议 3：记忆内容要写得结构化
-
-即使检索能力开得再强，记忆内容本身如果全是噪音，效果也不会好。
-建议搭配：
-
-- `MEMORY.md`：长期记忆
-- `memory/YYYY-MM-DD.md`：日常记录
-
----
-
-## 九、推荐结论
-
-对于 OpenClaw 的技术型使用场景，推荐默认开启：
-
-- 向量检索：**开**
-- 缓存 / 文件监听更新：**开**
-- 混合搜索：**开**
-
-推荐初始组合：
-
-- provider: `openai`
-- model: `Qwen/Qwen3-Embedding-8B`
-- baseUrl: `https://api.siliconflow.cn/v1`
-- hybrid: enabled
-- watch: enabled
-
-这套组合在“语义理解 + 精确关键词命中 + 日常增量更新”之间比较平衡，适合大多数 OpenClaw 记忆使用场景。
+以上即为仅针对“安装后的记忆检索配置、验证与修复”的操作文档。
