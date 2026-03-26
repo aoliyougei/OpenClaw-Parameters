@@ -1,17 +1,21 @@
 services:
-#------------ Nginx Proxy Manager  ----------------
-  nginx:
-    image: 'chishin/nginx-proxy-manager-zh:2.9.18'
-    container_name: nginx
-    restart: always
-    ports:
-      - '80:80'
-      #- '52001:81'
-      - '443:443'
+  xui:
+    image: enwaiax/x-ui
+    container_name: x-ui
     volumes:
-      - ./data:/data
-      - ./letsencrypt:/etc/letsencrypt
+      - ./db/:/etc/x-ui/
+      - ./cert/:/root/cert/
+    ports:
+      #- 54321:54321
+      - 54322:54322
+      - "54322:54322/udp"
+      - 54323:54323
+      - "54323:54323/udp"
+    restart: always
     networks:
       - net
+      - nginx_net
 networks:
-  net:
+    net:
+    nginx_net:
+      external:  true
