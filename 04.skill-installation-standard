@@ -1,0 +1,286 @@
+# OpenClaw Skill 安装标准（指导版）
+
+## 目的
+
+为当前 OpenClaw 环境建立统一、可执行、可验证的 Skill 安装标准，避免同名重复安装、非标准目录落盘、以及后续维护混乱。
+
+适用范围：
+
+- 当前主工作区 `/home/node/.openclaw/workspace`
+- 当前 OpenClaw 容器环境
+- 后续由助手代为安装的所有第三方 Skills
+
+---
+
+## 官方加载位置与优先级
+
+根据 OpenClaw 官方 Skills 文档，Skills 从以下三个位置加载：
+
+1. **内置 Skills**
+2. **托管/本地 Skills**：`~/.openclaw/skills`
+3. **工作区 Skills**：`<workspace>/skills`
+
+同名 Skill 的优先级为：
+
+```text
+<workspace>/skills  >  ~/.openclaw/skills  >  内置 Skills
+```
+
+可选地，还可以通过 `~/.openclaw/openclaw.json` 中的 `skills.load.extraDirs` 添加额外目录，但其优先级低于上述标准位置。
+
+---
+
+## 本环境的安装标准
+
+### 一、默认安装位置
+
+后续所有第三方 Skill，**默认安装到当前 workspace**：
+
+```text
+/home/node/.openclaw/workspace/skills/<skill-name>/SKILL.md
+```
+
+适用场景：
+
+- 当前助理/当前工作区专用的 Skill
+- 希望优先级最高
+- 希望最容易验证、最容易维护
+- 希望避免与共享目录或内置 Skill 冲突
+
+### 二、共享安装位置
+
+只有在**明确需要多个 agent 共用同一 Skill** 时，才安装到：
+
+```text
+/home/node/.openclaw/skills/<skill-name>/SKILL.md
+```
+
+适用场景：
+
+- 多个 agent / 多个 workspace 共享同一 Skill
+- 需要托管/本地统一覆盖
+- 不希望 Skill 绑定在单个 workspace 内
+
+### 三、非标准主安装位置
+
+以下目录**不作为当前 OpenClaw 环境的主安装标准**：
+
+```text
+~/.agents/skills
+```
+
+说明：
+
+- 即使某些外部 `skills` CLI 会把 Skill 安装到 `~/.agents/skills`
+- OpenClaw 也**不应默认依赖该目录**
+- 只有当 `~/.openclaw/openclaw.json` 的 `skills.load.extraDirs` **显式纳入该目录** 时，才可将其视为有效加载根
+
+---
+
+## 标准安装决策规则
+
+### 规则 1：默认装到 workspace
+
+如果 Skill 仅服务于当前助手或当前 workspace，则安装到：
+
+```text
+/home/node/.openclaw/workspace/skills
+```
+
+### 规则 2：共享需求才装到 `~/.openclaw/skills`
+
+如果用户明确表示该 Skill 要供多个 agent 共用，才安装到：
+
+```text
+/home/node/.openclaw/skills
+```
+
+### 规则 3：优先使用 OpenClaw 官方安装方式
+
+优先使用：
+
+```bash
+openclaw skills install <slug>
+```
+
+原因：
+
+- 符合 OpenClaw 官方工作流
+- 默认安装到当前 active workspace
+- 更利于后续更新、识别与排障
+
+### 规则 4：官方源不可用时走手动安装
+
+如果遇到以下情况：
+
+- ClawHub 限流（如 429 Rate limit exceeded）
+- 注册表临时不可用
+- 只有源码链接或原始 `SKILL.md`
+- 官方安装命令无法成功落地
+
+则改为手动安装：
+
+1. 确定目标 Skill 根目录
+2. 创建 Skill 目录
+3. 写入 `SKILL.md`
+4. 若 Skill 需要附加脚本/资源，再按规范写入同目录下的 `scripts/`、`references/`、`assets/` 等
+
+### 规则 5：安装后必须验证
+
+每次安装后，必须执行验证：
+
+```bash
+openclaw skills list
+```
+
+至少确认：
+
+- Skill 已被识别
+- 状态为 `ready` 或符合预期
+- Source 符合安装目标（如 `openclaw-workspace` 或 managed/local）
+
+### 规则 6：避免重复安装
+
+尽量避免同名 Skill 同时出现在多个标准根目录：
+
+- `<workspace>/skills`
+- `~/.openclaw/skills`
+- 其他 `extraDirs`
+
+因为这会带来：
+
+- 实际生效版本不直观
+- 后续更新混乱
+- 调试时难以判断来源
+
+### 规则 7：若确需重复，必须有明确覆盖意图
+
+只有在以下情况才允许保留多份同名 Skill：
+
+- 明确要用 workspace 版本覆盖共享版本
+- 做测试/迁移/临时比较
+- 用户明确要求保留多份副本
+
+否则应只保留一份主副本。
+
+---
+
+## 推荐的日常执行策略
+
+### 单工作区 / 当前主助手
+
+默认策略：
+
+```text
+安装到 /home/node/.openclaw/workspace/skills
+```
+
+这是本环境下最推荐的方式。
+
+### 多 agent 共享
+
+共享策略：
+
+```text
+安装到 /home/node/.openclaw/skills
+```
+
+### 外部 skills CLI 安装结果处理
+
+如果使用了类似：
+
+```bash
+npx skills add ...
+```
+
+并把 Skill 装到了：
+
+```text
+~/.agents/skills
+```
+
+则需要额外判断：
+
+- 当前 OpenClaw 是否真的加载该目录
+- 是否需要迁移到标准目录
+- 是否需要清理重复副本
+
+默认情况下，应**迁移或重装到标准 OpenClaw 技能目录**，而不是长期依赖 `~/.agents/skills`。
+
+---
+
+## 标准安装流程（推荐）
+
+### 方式 A：官方安装
+
+```bash
+openclaw skills install <skill-slug>
+openclaw skills list
+```
+
+### 方式 B：手动安装
+
+```text
+1. 选择目标目录：workspace/skills 或 ~/.openclaw/skills
+2. 创建 <skill-name>/
+3. 写入 SKILL.md
+4. 执行 openclaw skills list 验证
+```
+
+---
+
+## 验证清单
+
+安装或迁移任意 Skill 后，至少检查以下项目：
+
+- [ ] `SKILL.md` 位于标准目录
+- [ ] skill 名称与目录命名合理
+- [ ] `openclaw skills list` 能识别该 Skill
+- [ ] Source 与目标安装位置一致
+- [ ] 同名 Skill 没有无意重复安装
+- [ ] 如需共享，已确认放在 `~/.openclaw/skills`
+- [ ] 如需单工作区优先，已确认放在 `<workspace>/skills`
+
+---
+
+## 最终标准（简版）
+
+### 默认原则
+
+**后续所有第三方 Skill 默认安装到：**
+
+```text
+/home/node/.openclaw/workspace/skills
+```
+
+### 例外原则
+
+**只有当明确需要多 agent 共享时，才安装到：**
+
+```text
+/home/node/.openclaw/skills
+```
+
+### 排除原则
+
+**不把 `~/.agents/skills` 作为当前 OpenClaw 环境的主安装标准。**
+
+### 验证原则
+
+**每次安装后必须运行：**
+
+```bash
+openclaw skills list
+```
+
+---
+
+## 备注
+
+本标准基于 OpenClaw 官方文档《Skills》页面整理，并结合当前环境的实际加载行为制定。
+
+当前推荐结论：
+
+- **默认：workspace/skills**
+- **共享：~/.openclaw/skills**
+- **不默认使用：~/.agents/skills**
