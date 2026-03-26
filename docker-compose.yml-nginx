@@ -1,0 +1,17 @@
+services:
+#------------ Nginx Proxy Manager  ----------------
+  nginx:
+    image: 'chishin/nginx-proxy-manager-zh:2.9.18'
+    container_name: nginx
+    restart: always
+    ports:
+      - '80:80'
+      #- '52001:81'
+      - '443:443'
+    volumes:
+      - ./data:/data
+      - ./letsencrypt:/etc/letsencrypt
+    networks:
+      - net
+networks:
+  net:
