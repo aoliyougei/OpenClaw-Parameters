@@ -79,7 +79,7 @@ https://github.com/aoliyougei/OpenClaw-Parameters/blob/main/03.OpenClaw%20%E8%AE
 ## 04 Skill 安装标准
 ```bash
 请阅读以下文档，并将其作为你的Skill 安装标准：
-https://github.com/aoliyougei/OpenClaw-Parameters/blob/main/03.OpenClaw%20%E8%AE%B0%E5%BF%86%E6%9C%80%E4%BD%B3%E5%AE%9E%E8%B7%B5
+https://github.com/aoliyougei/OpenClaw-Parameters/blob/main/04.skill-installation-standard
 具体要求：
 1. 提炼其中适合作为长期执行规则的内容，写入  ⁠AGENTS.md⁠ 
 2. 执行文档中的内容及规则
